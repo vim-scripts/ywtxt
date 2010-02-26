@@ -1,0 +1,334 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=2993
+
+1  Introduce:
+   
+   Ease vim to write plain document. It's at the very early stage, with
+   some fancy highlights. Any advice is welcome. My email is:
+
+   ywupub AT gmail DOT com
+
+2  Usage:
+
+   Open a new file: test.ywtxt, done.
+
+3  ywtxt file format:
+3.1  Heading format:
+
+ywtxt treats lines start with "#  " or "1  "(note the following 2
+spaces) as a 1st level heading, "#.#  " or "1.1  "(note the following 2
+spaces) as a 2nd level heading, so forth.
+
+Lines started with optional spaces and "%" are treated as a comment
+line. Characters between *bold* will get bolded, /italic/ italic,
+_underlined_ underlined.
+
+TODO and NOTE in document will get highlighted.
+   
+"Figure #.  ", "Fig. #.  ", "图 #.  ", "Table #.  ",  "表 #.  ",
+"Figure #-#.  ", "Fig. #-#.  ", "图 #-#.  ", "Table #-#.  ",  "表 #-#.  "
+will make ywtxt know it's a figure/table, and can generate the figures/tables
+of contents for them(note there are 2 spaces following the "#.".
+
+The first line in document with a trailing space is a title:
+        This is a title, note the spaces after the dot.  
+
+ywtxt use foldmethod 'marker' for mom document, so everything you can do with vim folding marker also can be implemented with ywtxt.
+
+3.2  Snip support:
+
+Hit <Ctrl-j> then s will prompt you insert a filetype of snip,
+you can use <tab> to auto-complete the filetype name. The snip region
+will get highlighted according to the syntax of it(if vim supports it).
+Warn, if you insert a filetype which vim doesn't support, you will meet
+error warning when opening the file.
+
+Note: Trying to insert ywtxt filetype as a snip will make ywtxt's
+folding fragible.
+
+3.3  Cross-references
+
+Define a anchor: '[#anchor]' without the prefix '*', then hit <enter> on the
+string "*[path/to/file#anchor]" will let you go to the anchor.
+
+Hit <Enter> on the pattern "*[path/to/file#anchor]" in document will let you
+go to the file and locate onto the "[#anchor]" position.
+For example: 
+    *[./mini2.ywtxt#string]
+Will go to mini2.ywtxt and locate on the anchor [#string].
+
+If you omit the "file" part in the pattern, then ywtxt will try to
+locate the position in the current document.
+For example: 
+    *[#string]
+Will go to the anchor [#string] in the current document.
+
+If document doesn't contain [#string], ywtxt will warn you and go to normal
+string "string".
+
+3.4  More highlightings
+
+There are times, however, when the simple markup isn't flexible enough.
+In such cases, You can use Txtfmt (The Vim Highlighter) to add arbitrary
+highlighting to my journal entries. The trick is to set 'filetype' equal
+to ywtxt.txtfmt instead of ywtxt alone. The following screenshot shows
+the result:
+    
+   http://txtfmt.webs.com/ywtxt.htm
+    
+The highlighting provided by Txtfmt is similar to "rich text" in a word
+processor: foreground/background colors and all combinations of
+underline, bold, italic, etc...
+    
+Txtfmt (The Vim Highlighter):
+http://www.vim.org/scripts/script.php?script_id=2208
+
+4  Key maps:
+4.1  Key maps for the normal window(mother file window):
+
+      <Tab>               Fold/unfold. Under ^[keyword], echo the corresponding reference name. Under the lines in the bibliography section, jump to the citing point of the document.
+      <Enter>             Under ^[keyword] or the lines in the bibliography section, jump into the .bib file and located to the coressponding location.
+      \t                  Open a table of contents(toc) window of the current document, it's named as "_<file you're writing>_TOC_" .
+      <Ctrl-j>            Prompt for inserting a new (parent/current/child/other level heading)/Non_export2html/Reference/Snip.
+      \o                  Insert a current level heading line.
+      \O                  Insert a parent level heading line.
+      \q                  Close the toc window.
+      \<tab>              Jump into the toc window without refreshing.
+
+4.2  key maps for insert mode
+      <Ctrl-j>            Prompt for inserting a new (parent/current/child/other level heading)/Non_export2html/Reference/Snip.
+      _{                  _{} insert a subscript.
+      ^{                  ^{} insert a superscript.
+      ^[                  ^[] insert a citation.
+
+4.3  key maps for toc window:
+
+      <Enter>             Jump into the coressponding location of the document.
+      <space>             Jump into the coressponding location of the document without leaving the toc window.
+      x                   Jump into the coressponding location of the document and close the toc window.
+      <Leader><tab>       Jump into the mother file window without changing the position.
+      q                   Close the toc window.
+      r                   Refresh the toc window.
+      Shift_H             Decrease the level of heading.
+      Shift_L             Increase the level of heading.
+      Shift_J             Move current heading region down.
+      Shift_K             Move current heading region up.
+      Shift_D             Delete current heading region, and put the content into register z.
+      Shift_Y             Yank current heading region, and put the content into register z.
+      Shift_S             Auto number the sections mark(#.) in mother file according to the toc's showing.
+      w                   Save the mother file.
+      u                   Undo the mother file.
+      ctrl_R              Redo the mother file.
+      Shift_E             Export the ywtxt file to simple html file.
+      Shift_X             Outline/un-outline the document. (Not working yet)
+      Shift_j             Go to the next line and outline the document. (Not working yet)
+      Shift_k             Go to the previous line and outline the document. (Not working yet)
+      t                   Toggle the toc type: "Con(t)ents/(F)igures/Ta(b)les/(A)nchors/(L)inks".
+
+5  html export feature:
+
+   In toc window, hit <shift-e> will export .ywtxt to .html file, after
+   saved the new openning buffer of the generated html file, you can
+   open the html in your browser, or even copy and paste it into your
+   office suite to reserve the looking of .ywtxt.
+
+   All strings _{} will become subscript, ^{} superscript. Comment lines
+   will be deleted. [/path/to/file.bmp] will display directly in
+   html(supports jpg, png, bmp and gif).
+
+   Hit <ctrl-j> then % will insert region mark: "^% BEGIN_NOHTML {{{", "^% END_NOHTML }}}". Regions between "^% BEGIN_NOHTML {{{", "^% END_NOHTML }}}" will not be exported to html. Warn!!!: please don't try to nested the region, otherwise you might break up your document!!!
+
+   Hint: You can export the .ywtxt to .html, then paste it into Microsoft Word, then the levels of heading will abey with the html.
+
+6  Misc vars:
+6.1  g:ywtxt_autonumber
+
+Configuring auto-setting the heading number after creating the heading. Note if you feel it makes vim slow down, you's better disable it.
+Example: set g:ywtxt_autonumber=0
+
+6.2  g:ywtxt_browserapp
+
+Configure the browser app for viewing the html after exported.
+You must make sure browser app is runable.
+Example: set g:ywtxt_browserapp = 'opera'
+
+6.3  g:ywtxt_tocwidth
+
+Configuration for toc window's width. Default is the document's 1/4.
+Example: set g:ywtxt_tocwidth=20
+
+6.4  g:ywtxt_headings_hl
+
+Specify the colors for headings, you must strictly follow the following pattern:
+
+    \ 'heading level':[['color for dark term', 'color for light term'], ['color for dark gui',], ['color for light gui'],
+
+otherwise, ywtxt will produce error.  Also note that the colors you specify must be ones that vim knows. The setting format is(example is the default setting) is:
+
+    let g:ywtxt_headings_hl = {
+                \ '1':[['blue', 'blue'],['LightSkyBlue', 'Blue1']],
+                \ '2':[['yellow', 'yellow'],['LightGoldenrod', 'DarkGoldenrod']],
+                \ '3':[['cyan', 'cyan'],['Cyan1', 'Purple']],
+                \ '4':[['red', 'red'],['red1', 'red']],
+                \ '5':[['green', 'green'],['PaleGreen', 'ForestGreen']],
+                \ '6':[['magenta', 'magenta'],['Aquamarine', 'CadetBlue']],
+                \ '7':[['blue', 'blue'],['LightSteelBlue', 'Orchid']],
+                \ '8':[['green', 'green'],['LightSalmon', 'RosyBrown']],
+                \ '9':[['blue', 'blue'],['LightSkyBlue', 'Blue1']],
+                \ '10':[['yellow', 'yellow'],['LightGoldenrod', 'DarkGoldenrod']],
+                \}
+
+You can add more highlighting levels than 10 as you wish.
+
+TIP: You can assign blank value for the default bg/fg color in bold face.
+
+let g:ywtxt_headings_hl = {
+            \ '1':[['', ''],['', '']],
+            \ '2':[['', ''],['', '']],
+            \ '3':[['', ''],['', '']],
+            \ '4':[['', ''],['', '']],
+            \ '5':[['', ''],['', '']],
+            \ '6':[['', ''],['', '']],
+            \ '7':[['', ''],['', '']],
+            \ '8':[['', ''],['', '']],
+            \ '9':[['', ''],['', '']],
+            \ '10':[['', ''],['', '']],
+            \}
+
+6.5  g:ywtxt_2htmlpre_usercmds, g:ywtxt_2htmlpost_usercmds
+
+You can run cmds before and after the 2html routine, format:
+
+    let g:ywtxt_2htmlpre_usercmds=['vim_cmd1', 'vim_cmd2']
+    let g:ywtxt_2htmlpost_usercmds=['vim_cmd3', 'vim_cmd4']
+
+for example,
+
+    let g:ywtxt_2htmlpre_usercmds=['set nonumber']
+    let g:ywtxt_2htmlpost_usercmds=['set number']
+
+will make the 2html routine disable the number the lines then back to 'number' option after 2html. However, if you want to do some modification operators, it's very dangrous, use at your own risk!!!
+7  Advanced features
+7.1  Customize section number style:
+
+For global effect: add a line as the following line in your .vimrc:
+
+    let g:ywtxt_HeadingsPat = '"Chapter #" "Section #" "#." "#.#"'
+
+For buffer effect: Add a line into .ywtxt(Must add it from a start of line, no any space allowed before the '%'):
+
+    % HEADINGS "Chapter #" "Section #" "#." "#.#"
+
+To immune from the global effect for some files: Add a line into .ywtxt(Must add it from a start of line, no any space allowed before the '%'):
+
+    % HEADINGS NONE
+
+Explanation:
+
+If you've defined the headings pattern as the above way, then next time you open the document,  ywtxt will use all(here is "Chapter #" "Section #" "#.") of patterns excluding the last one(here is "#.#") as the very first level headings' pattern, the last one is used for ywtxt to determine how to auto-generate the following deeper levels, in this example, the 1st level heading will be "Chapter #  ", 2nd "Section #  ", 3th "#.  ", 4th '#.# ', 5th '#.#.# ', and so on(Note the 2 spaces after the heading). You can omit the last one be a ywtxt's known pattern, then ywtxt will auto-generate the levels from the last one you've specified with "#.#", "#.#.#", ..., if you want ywtxt to auto-generate with other level, then you have to specify the last one with ywtxt's known heading pattern, e.g.  "#", "#.#", "#.#.#"... Heading is always followed by 2 spaces(but you don't need to specify the space here, ywtxt always auto-inserts them for you.).
+
+7.2  include other files
+
+    Lines starting with '% input /dir/to/file' will include another file when 2html. The feature is very limited at present, no proper heading syntax supporting.
+
+7.3  Advanced .bib file support:
+
+   Warn: It needs you have some basic knowledge on the bib file and its
+   format, if you haven't heard of it, please skip this section. ywtxt's
+   bib supporting is very limited, now it just fits for me, only works
+   for article class.
+
+7.3.1  Usage:
+
+      1) In .ywtxt, you can insert the text like '^[keyword1]' or
+      '^[keyword1, 2]' to mean referrig to a single or multiple references.
+      "keyword1" means the keyword in .bib file.
+
+      2) Add the following 2 lines into your foo.ywtxt file whereever you like:
+
+      % bibfile = '/path/to/your/bib/file.bib'
+      % endbib
+
+      3) In toc window, hit <Shift-b> will generate the Bibliography in
+      between the lines of mensioned above for you.
+
+      Warn!!! everything between the above lines will be deleted, you've been warned!
+
+      You can
+      
+        let g:ywtxt_bib_nump = 0
+
+      to disable the [<number>] ahead of the reference list.
+
+      4) Under the ^[keyword], use <Tab> to show you the reference name,
+      under the lines in the Bibliography section, use <Tab> to go to the
+      citing location in the document.
+
+      Under the ^[keyword] or lines in the Bibliography section, use
+      <Enter> to jump into the .bib file and located under the
+      corresponding location.
+
+      After exporting to html, ^[keyword] will change into ^[<num>].
+
+7.3.2  multiple references sections:
+
+You can use multiple references section, just be sure that every
+references section has the following two lines:
+
+      % bibfile = '/path/to/your/bib/file.bib'
+      % endbib
+
+7.3.3  .bib format:
+
+      It has some restrictions with the bib file: every item must start at a new line, and be embraced by {}, ended with a comma ','. Every entry must be ended at a separated line with '}', following is an example:
+
+      @article{keyword1,
+      title = {title},
+      author = {author1 and author2},
+      journal = {journal},
+      volumn = {1},
+      number = {1},
+      year = {2010},
+      pages = {1--2},
+      }
+
+      @book{keyword2,
+      author = {author1 and author2},
+      address = {Nanjing},
+      publisher = {publisher},
+      year = {2010},
+      }
+
+      Customize bib entry type:
+
+      To customize your own types of bib entry, you need to let ywvim know all of them firstly:
+
+          let g:ywtxt_bib_entrytypes = ["article", "book"] : 
+
+      Then specify the format for each bib entry that you have specified before, the format is a list: g:ywtxt_bib_entries_{type}, with the items [entry, trailing character] or [entry, heading character, traling character], the default in ywtxt is:
+
+          let g:ywtxt_bib_entries_article = [
+                      \["author",". "],
+                      \["title",". "],
+                      \["journal",", "],
+                      \["year",", "],
+                      \["volume",""],
+                      \["number","(", ") :"],
+                      \["pages",". "],
+                      \]
+          let s:ywtxt_bib_entries_book = [
+                      \["author",". "],
+                      \["title",". "],
+                      \["address",": "],
+                      \["publisher",", "],
+                      \["year",". "],
+                      \]
+
+8  Thanks
+
+   txtbrowser[http://www.vim.org/scripts/script.php?script_id=2899]'s author Guoyooo Ping for the inspiration.
+
+9  Todoes:
+   1) Support to bib input's auto-completion and other input
+   auto-completions
+
+   2) To integrate vimwiki's table support.
