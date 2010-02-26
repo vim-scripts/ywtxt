@@ -25,18 +25,32 @@ endfunction "}}}
 
 function Ywtxt_Jump() "{{{ Jump to txt
     let l = s:Ywtxt_TOC[line('.') - 1][1]
-    let bufwinnr = bufwinnr(b:ywtxt_bufnr)
+    let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
     if bufwinnr
         execute bufwinnr . 'wincmd w'
         execute 'normal ' . l . 'Gzv'
     endif
 endfunction "}}}
 
-function Ywtxt_TOC() "{{{ Table of Contents
-    let bufnr = bufnr("")
-    let bufheight = 12
-    let cur_cursor = line(".")
-    let filelst = readfile(expand('%'))
+function Ywtxt_OpenTOC(n) "{{{ Open toc window
+    " a:n == 1: open toc window, a:n == 0: just refresh toc.
+    call <SID>Ywtxt_TOC(a:n)
+endfunction "}}}
+
+function s:Ywtxt_TOC(n) "{{{ Generate toc.
+    " a:n == 1: open toc window, a:n == 0: just refresh toc.
+    if a:n == 1
+        let bufnr = bufnr("")
+        let bufname = expand("%:t:r")
+        let bufheight = 12
+        let cur_cursor = line(".")
+        let filelst = readfile(expand('%'))
+    elseif a:n == 0
+        let filelst = readfile(bufname(b:ywtxt_toc_mom_bufnr))
+        let cur_cursor = s:Ywtxt_TOC[line(".") - 1][1]
+    else
+        return
+    endif
     let fe = &fileencoding
     let enc = &encoding
     let m = 1
@@ -44,7 +58,7 @@ function Ywtxt_TOC() "{{{ Table of Contents
     let s:Ywtxt_TOC = []
     for l in filelst
         if match(l, s:ywtxt_headerexpr) == 0
-            if m <= cur_cursor
+            if m < cur_cursor
                 let n += 1
             endif
             call add(s:Ywtxt_TOC, [l, m])
@@ -57,29 +71,32 @@ function Ywtxt_TOC() "{{{ Table of Contents
             let s:Ywtxt_TOC[i][0] = iconv(s:Ywtxt_TOC[i][0], fe, enc)
         endfor
     endif
-    let bufwnr = bufwinnr('_' . expand("%:r") . '_TOC_')
-    if bufwnr == -1
-        if toc_len < bufheight
-            let bufheight = toc_len
+    if a:n == 1
+        let bufwnr = bufwinnr('_' . bufname . '_TOC_')
+        if bufwnr == -1
+            if toc_len < bufheight
+                let bufheight = toc_len
+            endif
+            execute 'keepalt ' . bufheight . 'split _' .  bufname . '_TOC_'
+            setlocal buftype=nofile
+            setlocal bufhidden=hide
+            setlocal noswapfile
+            setlocal filetype=ywtxt
+            execute 'set fileencoding='. fe
+            let b:ywtxt_toc_mom_bufnr = bufnr
+        elseif bufwnr != -1
+            execute bufwnr . 'wincmd w'
         endif
-        execute 'keepalt ' . bufheight . 'split _' .  expand("%:t") . '_TOC_'
-        setlocal buftype=nofile
-        setlocal bufhidden=hide
-        setlocal noswapfile
-        execute 'set fileencoding='. fe
-        setlocal filetype=ywtxt
-        let b:ywtxt_bufnr = bufnr
-    elseif bufwnr != -1
-        execute bufwnr . 'wincmd w'
     endif
-    setlocal modifiable
+    let toc = []
     for l in range(toc_len)
-        call append(line("$"), s:Ywtxt_TOC[l][0])
+        call add(toc, s:Ywtxt_TOC[l][0])
     endfor
-    execute 'normal dd' . (n - 1) . 'Gzv'
+    setlocal modifiable
+    %d
+    call setline(1, toc)
+    execute 'normal ' . n . 'Gzv'
     setlocal nomodifiable
-    nmap <silent> <buffer> q :bwipeout<CR>
-    nmap <silent> <buffer> <Space> :call Ywtxt_Jump()<CR>
 endfunction "}}}
 
 function Ywtxt_CreateHeader(l) "{{{
@@ -93,5 +110,20 @@ function Ywtxt_CreateHeader(l) "{{{
     startinsert!
 endfunction
 "}}}
+
+function Ywtxt_keymaps() "{{{ key maps for normal window
+    nmap <silent> <buffer> <Tab> za
+    if match(bufname(""), '_.*_TOC_') == -1
+        nmap <silent> <buffer> <Leader>t :call Ywtxt_OpenTOC(1)<CR>
+        nmap <silent> <buffer> <Leader>i :call Ywtxt_CreateHeader(1)<CR>
+        nmap <silent> <buffer> <Leader>o :call Ywtxt_CreateHeader(0)<CR>
+        nmap <silent> <buffer> <Leader><s-o> :call Ywtxt_CreateHeader(-1)<CR>
+        nmap <silent> <buffer> <Leader>q :execute 'silent! bwipeout ' . bufnr('_' . expand("%:t:r") . '_TOC_')<CR>
+    else
+        nmap <silent> <buffer> q :bwipeout<CR>
+        nmap <silent> <buffer> r :call Ywtxt_OpenTOC(0)<CR>
+        nmap <silent> <buffer> <Space> :call Ywtxt_Jump()<CR>
+    endif
+endfunction "}}}
 
 " vim: foldmethod=marker:
