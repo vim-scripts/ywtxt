@@ -47,18 +47,18 @@ function s:Ywtxt_TOC(n) "{{{ Generate toc.
     " a:n == 1: open toc window, a:n == 0: just refresh toc.
     if a:n == 1
         let bufnr = bufnr("")
+        let maxline = line("$")
         let bufname = expand("%:t:r")
         let bufheight = 12
         let cur_cursor = line(".")
-        let filelst = readfile(expand('%'))
+        " let filelst = readfile(expand('%'))
+        let filelst = getbufline("", 1, line('$'))
     elseif a:n == 0
-        let filelst = readfile(bufname(b:ywtxt_toc_mom_bufnr))
+        let filelst = getbufline(b:ywtxt_toc_mom_bufnr, 1, b:ywtxt_toc_mom_maxline)
         let cur_cursor = s:Ywtxt_TOC[line(".") - 1][2]
     else
         return
     endif
-    let fe = &fileencoding
-    let enc = &encoding
     let rlinenum = 1
     let n = 1
     let s:Ywtxt_TOC = []
@@ -89,11 +89,6 @@ function s:Ywtxt_TOC(n) "{{{ Generate toc.
     endfor
     let g:test = s:Ywtxt_TOC
     let toc_len = len(s:Ywtxt_TOC)
-    if ( fe != enc ) && has("iconv")
-        for i in range(toc_len)
-            let s:Ywtxt_TOC[i][1] = iconv(s:Ywtxt_TOC[i][1], fe, enc)
-        endfor
-    endif
     if a:n == 1
         let bufwnr = bufwinnr('_' . bufname . '_TOC_')
         if bufwnr == -1
@@ -105,7 +100,7 @@ function s:Ywtxt_TOC(n) "{{{ Generate toc.
             setlocal bufhidden=hide
             setlocal noswapfile
             setlocal filetype=ywtxt
-            execute 'set fileencoding='. fe
+            let b:ywtxt_toc_mom_maxline = maxline
             let b:ywtxt_toc_mom_bufnr = bufnr
         elseif bufwnr != -1
             execute bufwnr . 'wincmd w'
@@ -151,7 +146,6 @@ function Ywtxt_reindent(...) "{{{ Reindent the level of header
         execute startline.','.endline.'s/^\(\%(\d\+\|#\)[[:digit:]#.]*\.\)\ze\s/#.\1/e'
     endif
     call setpos('.', save_cursor)
-    write
     wincmd p
     call <SID>Ywtxt_TOC(0)
 endfunction "}}}
