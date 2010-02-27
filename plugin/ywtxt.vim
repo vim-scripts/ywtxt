@@ -27,7 +27,7 @@ endfunction "}}}
 
 function Ywtxt_Jump(n) "{{{ Jump to txt
     let bufnr = bufnr(bufname(""))
-    let l = s:Ywtxt_TOC[line('.') - 1][1]
+    let l = s:Ywtxt_TOC[line('.') - 1][2]
     let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
     if bufwinnr
         execute bufwinnr . 'wincmd w'
@@ -53,29 +53,45 @@ function s:Ywtxt_TOC(n) "{{{ Generate toc.
         let filelst = readfile(expand('%'))
     elseif a:n == 0
         let filelst = readfile(bufname(b:ywtxt_toc_mom_bufnr))
-        let cur_cursor = s:Ywtxt_TOC[line(".") - 1][1]
+        let cur_cursor = s:Ywtxt_TOC[line(".") - 1][2]
     else
         return
     endif
     let fe = &fileencoding
     let enc = &encoding
-    let m = 1
+    let rlinenum = 1
     let n = 1
     let s:Ywtxt_TOC = []
-    for l in filelst
-        if match(l, s:ywtxt_headerexpr) == 0
-            if m < cur_cursor
+    for line in filelst
+        let header = matchstr(line, s:ywtxt_headerexpr)
+        let hdlen = strlen(header)
+        let hlen = (hdlen / 2)
+        if hlen
+            " number generating
+            if !exists("sec" . hlen) || (secmaxlev < hlen)
+                execute 'let sec' . hlen . '=1'
+            else
+                execute 'let sec' . hlen . '+=1'
+            endif
+            let secmaxlev = hlen
+            if rlinenum < cur_cursor - 1
                 let n += 1
             endif
-            call add(s:Ywtxt_TOC, [l, m])
-            " l: line content. m: file_mom number.
+            let secnum = ''
+            for li in range(1, hlen)
+                execute 'let secnum .=sec' . li . ' . "."'
+            endfor
+            let tail = strpart(line, hdlen)
+            call add(s:Ywtxt_TOC, [header, tail, rlinenum, secnum])
+            " line: header(0) + tail(1). rlinenum(2): file_mom real line num. secnum: sec num(3)
         endif
-        let m += 1
+        let rlinenum += 1
     endfor
+    let g:test = s:Ywtxt_TOC
     let toc_len = len(s:Ywtxt_TOC)
     if ( fe != enc ) && has("iconv")
         for i in range(toc_len)
-            let s:Ywtxt_TOC[i][0] = iconv(s:Ywtxt_TOC[i][0], fe, enc)
+            let s:Ywtxt_TOC[i][1] = iconv(s:Ywtxt_TOC[i][1], fe, enc)
         endfor
     endif
     if a:n == 1
@@ -97,7 +113,7 @@ function s:Ywtxt_TOC(n) "{{{ Generate toc.
     endif
     let toc = []
     for l in range(toc_len)
-        call add(toc, s:Ywtxt_TOC[l][0])
+        call add(toc, s:Ywtxt_TOC[l][3] . s:Ywtxt_TOC[l][1])
     endfor
     setlocal modifiable
     %d
