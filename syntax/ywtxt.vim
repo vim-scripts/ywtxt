@@ -6,11 +6,19 @@ if exists("b:current_syntax")
   finish
 endif
 
-syntax match ywtxtcomment '^%.*$'
-highlight default link ywtxtcomment Comment
+syntax match ywtxt_comment '\[\(\k\+,\s*\)*\(\k\+\)\]'
+highlight default link ywtxt_comment Comment
+
+syntax match ywtxt_comment '^%.*$'
+highlight default link ywtxt_comment Comment
+
+syntax match ywtxt_Fig '^\s*Fig\.\s\(#\|\d\+\)\.\s'
+highlight default link ywtxt_Fig Comment
+syntax match ywtxt_Tab '^\s*Table\s\(#\|\d\+\)'
+highlight default link ywtxt_Tab Comment
 
 for i in range(1,10)
-  execute 'syntax match ywtxt_header'.i.' /^\(\d\+.\|#\.\)\{'.i.'}\s.*$/ contains=ALL'
+  execute 'syntax match ywtxt_header'.i.' /^\(\d\+\.\|#\.\)\{'.i.'}\s.*$/ contains=ALL'
 endfor
 if &background == "dark"
   highlight ywtxt_header0 ctermfg=blue cterm=bold guifg=LightSkyBlue gui=bold
