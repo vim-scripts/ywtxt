@@ -17,6 +17,15 @@ highlight default link ywtxt_Fig Comment
 syntax match ywtxt_Tab '^\s*Table\s\(#\|\d\+\)'
 highlight default link ywtxt_Tab Comment
 
+syntax match ywtxt_bold '\%(\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\(\s\|$\)'
+highlight ywtxt_bold term=bold cterm=bold gui=bold
+
+syntax match ywtxt_underline '\%(\s\|^\)\zs_[^[:blank:]_]\+_\ze\(\s\|$\)'
+highlight ywtxt_underline term=underline cterm=underline gui=underline
+
+syntax match ywtxt_italic '\%(\s\|^\)\zs/[^[:blank:]/]\+/\ze\(\s\|$\)'
+highlight ywtxt_italic term=italic cterm=italic gui=italic
+
 for i in range(1,10)
   execute 'syntax match ywtxt_header'.i.' /^\(\d\+\.\|#\.\)\{'.i.'}\s.*$/ contains=ALL'
 endfor
