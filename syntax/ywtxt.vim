@@ -6,13 +6,13 @@ if exists("b:current_syntax")
   finish
 endif
 
-syntax match ywtxt_comment '\[\(\k\+,\s*\)*\(\k\+\)\]'
-highlight default link ywtxt_comment Comment
+syntax match ywtxt_ref '\^\[[^]]*\]'
+highlight default link ywtxt_ref Comment
 
 syntax match ywtxt_comment '^%.*$'
 highlight default link ywtxt_comment Comment
 
-syntax match ywtxt_Fig '^\s*Fig\.\s\(#\|\d\+\)\.\s'
+syntax match ywtxt_Fig '^\s*Fig\(\.\|ure\)\s\(#\|\d\+\)\.\s'
 highlight default link ywtxt_Fig Comment
 syntax match ywtxt_Tab '^\s*Table\s\(#\|\d\+\)'
 highlight default link ywtxt_Tab Comment
