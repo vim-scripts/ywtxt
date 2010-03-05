@@ -6,10 +6,15 @@ if exists("b:current_syntax")
   finish
 endif
 
+syn keyword ywtxt_todo contained FIXME TODO
+highlight default link ywtxt_todo Todo
+syn keyword ywtxt_note note Note NOTE note: Note: NOTE: Notes Notes:
+highlight default link ywtxt_note Todo
+
 syntax match ywtxt_ref '\^\[[^]]*\]'
 highlight default link ywtxt_ref Comment
 
-syntax match ywtxt_comment '^%.*$'
+syntax match ywtxt_comment '^%.*$' contains=CONTAINED
 highlight default link ywtxt_comment Comment
 
 syntax match ywtxt_Fig '^\s*Fig\(\.\|ure\)\s\(#\|\d\+\)\.\s'

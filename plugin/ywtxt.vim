@@ -15,7 +15,7 @@ let s:ywtxt_path = expand("<sfile>:p:h")
 let s:ywtxt_refpat = '\^\[[^]]*\]'
 let s:ywtxt_headersymbol = '#.'
 let s:ywtxt_headerexpr = '^\(\d\+\|#\)[[:digit:]#.]*\.\ze\s'
-let s:ywtxt_biblioname = '参考文献'
+let s:ywtxt_biblioname = 'Bibliography'
 if exists("g:ywtxt_biblioname")
     let s:ywtxt_biblioname = g:ywtxt_biblioname
     unlet g:ywtxt_biblioname
@@ -58,7 +58,7 @@ function s:Ywtxt_TOC(n) "{{{ Generate toc.
     if a:n == 1
         let bufnr = bufnr("")
         let bufname = expand("%:t:r")
-        let bufheight = 12
+        " let bufheight = 12
         let cur_cursor = line(".")
         let filelst = getbufline("", 1, '$')
     elseif a:n == 0
@@ -99,10 +99,11 @@ function s:Ywtxt_TOC(n) "{{{ Generate toc.
     if a:n == 1
         let bufwnr = bufwinnr('_' . bufname . '_TOC_')
         if bufwnr == -1
-            if toc_len < bufheight
-                let bufheight = toc_len
-            endif
-            execute 'keepalt ' . bufheight . 'split _' .  bufname . '_TOC_'
+            " if toc_len < bufheight
+            "     let bufheight = toc_len
+            " endif
+            " execute 'keepalt ' . bufheight . 'split _' .  bufname . '_TOC_'
+            execute 'keepalt ' . (winwidth(bufwinnr(bufnr)) / 4)  . 'vsplit _' .  bufname . '_TOC_'
             setlocal buftype=nofile
             setlocal bufhidden=hide
             setlocal noswapfile
@@ -391,6 +392,19 @@ function Ywtxt_Tab(k) "{{{ Function for <enter>
     elseif a:k == 'e'
         normal j
     endif
+endfunction "}}}
+
+function s:Ywtxt_ToHtml() "{{{ TODO ywtxt to html
+    let file = input("Which file?: ", "", "file")
+    if filereadable(file)
+        return
+    endif
+    !% > file
+    execute 'edit ' . file
+    %s/^\%(#\.\|\d\+\.\)\s\(.*$\)/<h1>\1\<h1>/
+    %s/^\%(#\.\|\d\+\.\)\{1\}\s\(.*$\)/<h2>\1\<h2>/
+    %s/\s\zs\*\(\S\+\)\*\ze\s/<strong>\1\<strong2>/
+    %s/\s\zs\(\S\+\.\(jpg\|png\|bmp\)\)/<img src="\1">/
 endfunction "}}}
 
 " vim: foldmethod=marker:
