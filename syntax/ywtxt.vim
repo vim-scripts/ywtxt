@@ -22,17 +22,17 @@ highlight default link ywtxt_Fig Comment
 syntax match ywtxt_Tab '^\s*Table\s\(#\|\d\+\)'
 highlight default link ywtxt_Tab Comment
 
-syntax match ywtxt_bold '\%(\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\(\s\|$\)'
+syntax match ywtxt_bold '\%([[:punct:]]\|\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\([[:punct:]]\|\s\|$\)'
 highlight ywtxt_bold term=bold cterm=bold gui=bold
 
-syntax match ywtxt_underline '\%(\s\|^\)\zs_[^[:blank:]_]\+_\ze\(\s\|$\)'
+syntax match ywtxt_underline '\%([[:punct:]]\|\s\|^\)\zs_[^[:blank:]_]\+_\ze\([[:punct:]]\|\s\|$\)'
 highlight ywtxt_underline term=underline cterm=underline gui=underline
 
-syntax match ywtxt_italic '\%(\s\|^\)\zs/[^[:blank:]/]\+/\ze\(\s\|$\)'
+syntax match ywtxt_italic '\%([[:punct:]]\|\s\|^\)\zs/[^[:blank:]/]\+/\ze\([[:punct:]]\|\s\|$\)'
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
 for i in range(1,10)
-  execute 'syntax match ywtxt_header'.i.' /^\(\d\+\.\|#\.\)\{'.i.'}\s.*$/ contains=ALL'
+  execute 'syntax match ywtxt_header'.i.' /^\(\d\+\.\|#\.\)\{'.i.'}\s.*$/ contains=CONTAINED'
 endfor
 if &background == "dark"
   highlight ywtxt_header0 ctermfg=blue cterm=bold guifg=LightSkyBlue gui=bold
