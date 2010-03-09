@@ -36,7 +36,7 @@ endif
 let s:ywtxt_refpat = '\^\[[^]]*\]'
 let s:ywtxt_headingsymbol = '#.'
 let s:ywtxt_heading1_expr_lst = '^\%(#\|\d\+\)\.\s'
-let s:ywtxt_headingn_expr_lst = '^\s*\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\s'
+let s:ywtxt_headingn_expr_lst = '^\s\{3,\}\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\s'
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
 
@@ -229,7 +229,7 @@ function Ywtxt_toc_cmd(op,pos,...) "{{{ command on mom file in toc window.
     endif
     call setpos('.', save_cursor)
     wincmd p
-    call Ywtxt_OpenTOC()
+    silent call Ywtxt_OpenTOC()
     call setpos('.', toc_save_cursor)
 endfunction "}}}
 
@@ -278,7 +278,7 @@ function Ywtxt_ReIndent(d) "{{{ Reindent
 endfunction "}}}
 
 function s:Ywtxt_OpenBibFile(w) " {{{ Open bib file.
-    let bibfile = matchstr(getline(searchpos('^% bibfile = ', 'nw')[0]), '^% bibfile = ''\zs[^'']*')
+    let bibfile = matchstr(getline(searchpos('^\s*% bibfile = ', 'nw')[0]), '^\s*% bibfile = ''\zs[^'']*')
     let bufwnr = bufwinnr(expand(bibfile))
     if bufwnr == -1
         execute 'split ' . bibfile
@@ -295,7 +295,7 @@ function s:Ywtxt_GetBibEntry(...) " {{{ Show bib entry
     else
         let ywbib_cur_bibentry = expand("<cword>")
     endif
-    let bibfile = matchstr(getline(searchpos('^% bibfile = ', 'nw')[0]), '^% bibfile = ''\zs[^'']*')
+    let bibfile = matchstr(getline(searchpos('^\s*% bibfile = ', 'nw')[0]), '^\s*% bibfile = ''\zs[^'']*')
     if !filereadable(bibfile)
         if  !exists("a:1")
             echo 'No bib file found'
@@ -388,9 +388,11 @@ endfunction "}}}
 function s:Ywtxt_GenBibliography() "{{{ Generate bibliography.
     let save_cursor = getpos(".")
     let refsi = searchpos('\%(' . s:ywtxt_heading1_expr_lst . '\|' . s:ywtxt_headingn_expr_lst . '\)' . s:ywtxt_biblioname, 'nw')[0]
-    let refei = searchpos('% bibfile = ', 'nw')[0]
+    let refei = searchpos('^\s*% bibfile = ', 'nw')[0]
     if (refsi == 0) || (refei == 0) || (refei < (refsi + 1))
+        echohl ErrorMsg
         echo "References section not found, see the document to make .bib support work."
+        echohl None
         return
     endif
     call <SID>Ywtxt_GetRefLst()
@@ -468,7 +470,7 @@ endfunction "}}}
 
 function Ywtxt_Tab(k) "{{{ Function for <enter>
     let refsi = searchpos(s:ywtxt_biblioname, 'nw')[0]
-    let refei = searchpos('% bibfile = ', 'nw')[0]
+    let refei = searchpos('^\s*% bibfile = ', 'nw')[0]
     let line = getline('.')
     let lnum = line('.')
     if (refsi > 0) && (lnum > refsi) && (lnum < refei)
