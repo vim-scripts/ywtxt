@@ -22,40 +22,33 @@ if exists("g:ywtxt_tocwidth")
     let s:ywtxt_tocwidth = g:ywtxt_tocwidth
     unlet g:ywtxt_tocwidth
 endif
-let s:ywtxt_syntax_todo = ''
-if exists("g:ywtxt_syntax_todo")
-    let s:ywtxt_syntax_todo = g:ywtxt_syntax_todo
-    unlet g:ywtxt_syntax_todo
-endif
-let s:ywtxt_syntax_note = ''
-if exists("g:ywtxt_syntax_note")
-    let s:ywtxt_syntax_note = g:ywtxt_syntax_note
-    unlet g:ywtxt_syntax_note
-endif
-
-let s:ywtxt_refpat = '\^\[[^]]*\]'
-let s:ywtxt_headingsymbol = '#.'
-let s:ywtxt_heading1_expr_lst = '^\%(#\|\d\+\)\.\s'
-let s:ywtxt_headingn_expr_lst = '^\s\{3,\}\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\s'
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
 
+function s:Ywtxt_HeadingP(l) "{{{ Determine if it's heading.
+    let line = a:l
+    let heading = matchstr(line, '^\%(#\|\d\+\)\.\s')
+    if heading != ''
+        return [1, 1]
+    endif
+    let indent = strlen(matchstr(line, '^\s*'))
+    if indent % 3 != 0
+        continue
+    endif
+    let match_heading_indent = indent / 3
+    let match_heading_num = len(split(matchstr(line, '^\s*\zs\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\ze\s'), '\.'))
+    if (match_heading_indent + 1) == match_heading_num
+        return [1, match_heading_num]
+    else
+        return [0, 0]
+    endif
+endfunction "}}}
+
 function Ywtxt_FoldExpr(l) "{{{ Folding rule.
     let line=getline(a:l)
-    if (match(line, s:ywtxt_heading1_expr_lst) != -1)
-        return '>1'
-    elseif (match(line, s:ywtxt_headingn_expr_lst) != -1)
-        let indent = strlen(matchstr(line, '^\s*'))
-        if indent % 3 != 0
-            continue
-        endif
-        let match_heading_indent = indent / 3
-        let match_heading_num = len(split(matchstr(line, '^\s*\zs\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\ze\s'), '\.'))
-        if (match_heading_indent + 1) == match_heading_num
-            return '>' . match_heading_num
-        else
-            return '='
-        endif
+    let headingp = <SID>Ywtxt_HeadingP(line)
+    if headingp[0]
+        return '>' . headingp[1]
     else
         return '='
     endif
@@ -97,50 +90,38 @@ function s:Ywtxt_GetHeadings() "{{{ Get headings
     let secmaxlev = 0
     for line in filelst
         let momlnum += 1
-        let heading = matchstr(line, s:ywtxt_heading1_expr_lst)
-        if heading != ''
-            let match_heading_indent = 0
-            let hlevel = 1
-        elseif (match(line, s:ywtxt_headingn_expr_lst) != -1)
-            let indent = strlen(matchstr(line, '^\s*'))
-            if indent % 3 != 0
-                continue
-            endif
-            let match_heading_indent = indent / 3
-            let match_heading_num = len(split(matchstr(line, '^\s*\zs\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\ze\s'), '\.'))
-            if (match_heading_indent + 1) == match_heading_num
-                let hlevel = match_heading_num
-            endif
+        let headingp = <SID>Ywtxt_HeadingP(line)
+        if headingp[0]
+            let hlevel = headingp[1]
         else
             continue
         endif
-        if hlevel
-            " number generating
-            if !exists("sec" . hlevel) || (secmaxlev < hlevel)
-                execute 'let sec' . hlevel . '=1'
-            else
-                execute 'let sec' . hlevel . '+=1'
-            endif
-            let secmaxlev = hlevel
-            if momlnum <= cur_cursor
-                let n = len(toclst) + 1
-            endif
-            let secnum = ''
-            if hlevel == 1
-                let secnum .=sec1 . ". "
-            else
-                for li in range(1, hlevel)
-                    if li != hlevel
-                        execute 'let secnum .=sec' . li . ' . "."'
-                    else
-                        execute 'let secnum .=sec' . li . ' . " "'
-                    endif
-                endfor
-            endif
-            let tail = matchstr(line, '^\s*[#[:digit:].]\+\s\zs.*')
-            call add(toclst, [heading, tail, momlnum, repeat(' ', (3 * (hlevel - 1))) . secnum])
-            " real line: heading(0) + tail(1). momlnum(2): file_mom current line number in Mom window. secnum(3): section number.
+        let heading = matchstr(line, '^\s*[#[:digit:].]\+\s')
+        " number generating
+        if !exists("sec" . hlevel) || (secmaxlev < hlevel)
+            execute 'let sec' . hlevel . '=1'
+        else
+            execute 'let sec' . hlevel . '+=1'
         endif
+        let secmaxlev = hlevel
+        if momlnum <= cur_cursor
+            let n = len(toclst) + 1
+        endif
+        let secnum = ''
+        if hlevel == 1
+            let secnum .=sec1 . ". "
+        else
+            for li in range(1, hlevel)
+                if li != hlevel
+                    execute 'let secnum .=sec' . li . ' . "."'
+                else
+                    execute 'let secnum .=sec' . li . ' . " "'
+                endif
+            endfor
+        endif
+        let tail = matchstr(line, '^\s*[#[:digit:].]\+\s\zs.*')
+        call add(toclst, [heading, tail, momlnum, repeat(' ', (3 * (hlevel - 1))) . secnum])
+        " real line: heading(0) + tail(1). momlnum(2): file_mom current line number in Mom window. secnum(3): section number.
     endfor
     return [toclst, n] " n: curren section
 endfunction "}}}
@@ -193,9 +174,9 @@ function Ywtxt_CreateHeading(l) "{{{ Create Heading.
         let ln = line('.')
     endif
     if (fl + a:l) > 1
-        let heading = repeat(' ', (3 * (foldlevel(".") + a:l - 1))) . repeat(s:ywtxt_headingsymbol, (foldlevel(".") + a:l - 1)) . '#'
+        let heading = repeat(' ', (3 * (foldlevel(".") + a:l - 1))) . repeat('#.', (foldlevel(".") + a:l - 1)) . '#'
     else
-        let heading = s:ywtxt_headingsymbol
+        let heading = '#.'
     endif
     execute ln . "put ='" . heading . " '"
     normal zv
@@ -387,7 +368,7 @@ endfunction "}}}
 
 function s:Ywtxt_GenBibliography() "{{{ Generate bibliography.
     let save_cursor = getpos(".")
-    let refsi = searchpos('\%(' . s:ywtxt_heading1_expr_lst . '\|' . s:ywtxt_headingn_expr_lst . '\)' . s:ywtxt_biblioname, 'nw')[0]
+    let refsi = searchpos('^\s*[#[:digit:].]\+\s' . s:ywtxt_biblioname, 'nw')[0]
     let refei = searchpos('^\s*% bibfile = ', 'nw')[0]
     if (refsi == 0) || (refei == 0) || (refei < (refsi + 1))
         echohl ErrorMsg
@@ -412,7 +393,7 @@ function s:Ywtxt_GetRefLst() "{{{ Get bibs
     let save_cursor = getpos(".")
     let biblines = []
     let biblst=[]
-    execute 'g/' . s:ywtxt_refpat . "/call add(biblines, getline('.'))"
+    g/\^\[[^]]*\]/call add(biblines, getline('.'))
     for line in biblines
         for bibs in filter(split(line, '\(\ze\^\[\|\]\zs\)'), "v:val =~ '\\^\\[[^]]*\\]'")
             for bib in split(substitute(bibs[2:-2], '\s\+', '', 'g'), ',')
@@ -537,11 +518,10 @@ endfunction "}}}
 " command -bar -range=% YwtxtTOhtml call Ywtxt_ToHtml(<line1>,<line2>)
 
 function Ywtxt_Indent() "{{{ Indent func.
-    let curln = getline('.')
-    if match(curln, '^\%(#\|\d\+\)\.\s\+') == 0
-        return 0
-    elseif match(curln, '^\s*\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\s\+') == 0
-        return (3 * (foldlevel('.') - 1))
+    let line = getline('.')
+    let headingp = <SID>Ywtxt_HeadingP(line)
+    if headingp[0]
+        return (3 * (headingp[1] - 1))
     else
         return (3 * foldlevel('.'))
     endif
