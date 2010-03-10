@@ -25,30 +25,26 @@ endif
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
 
-function s:Ywtxt_HeadingP(l) "{{{ Determine if it's heading.
+function s:Ywtxt_HeadingP(l, ...) "{{{ Determine if it's heading.
+    " a:1: == 1: force to assure current window is mom window.
     let line = a:l
-    let heading = matchstr(line, '^\%(#\|\d\+\)\.\s')
-    if heading != ''
-        return [1, 1]
-    endif
-    let indent = strlen(matchstr(line, '^\s*'))
-    if indent % 3 != 0
-        return [0, 0]
-    endif
-    let match_heading_indent = indent / 3
-    let match_heading_num = len(split(matchstr(line, '^\s*\zs\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\ze\s'), '\.'))
-    if (match_heading_indent + 1) == match_heading_num
-        return [1, match_heading_num]
+    if match(bufname(""), '_.*_TOC_') + 1 || !exists("a:1") " Detect if toc(1) or mom(0) window
+        let match_heading_num = len(split(matchstr(line, '^\s*\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s'), '\.'))
     else
-        return [0, 0]
+        let match_heading_num = len(split(matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s\{2}'), '\.'))
     endif
+    return match_heading_num
 endfunction "}}}
 
 function Ywtxt_FoldExpr(l) "{{{ Folding rule.
     let line=getline(a:l)
     let headingp = <SID>Ywtxt_HeadingP(line)
-    if headingp[0]
-        return '>' . headingp[1]
+    if headingp
+        return '>' . headingp
+    elseif match(line, '^\s*% BEGINSNIP ') != -1
+        return 'a1'
+    elseif match(line, '^\s*% ENDSNIP') != -1
+        return 's1'
     else
         return '='
     endif
@@ -57,12 +53,12 @@ endfunction "}}}
 function Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
     " a:n: == 2: wipeout the toc window
     let tocwp = match(bufname(""), '_.*_TOC_') + 1 " Detect if toc(1) or mom(0) window
-    let toc = <SID>Ywtxt_GetHeadings()
+    let toclst = <SID>Ywtxt_GetHeadings()
     if tocwp
         let bufnr = bufnr(bufname(""))
         let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
         if bufwinnr
-            let l = toc[0][line('.') - 1][2]
+            let l = toclst[0][line('.') - 1][2]
             execute bufwinnr . 'wincmd w'
             execute 'normal ' . l . 'Gzv'
         endif
@@ -90,13 +86,12 @@ function s:Ywtxt_GetHeadings() "{{{ Get headings
     let secmaxlev = 0
     for line in filelst
         let momlnum += 1
-        let headingp = <SID>Ywtxt_HeadingP(line)
-        if headingp[0]
-            let hlevel = headingp[1]
+        let hlevel = <SID>Ywtxt_HeadingP(line, 1)
+        if hlevel
+            let hlevel = hlevel
         else
             continue
         endif
-        let heading = matchstr(line, '^\s*[#[:digit:].]\+\s')
         " number generating
         if !exists("sec" . hlevel) || (secmaxlev < hlevel)
             execute 'let sec' . hlevel . '=1'
@@ -107,27 +102,24 @@ function s:Ywtxt_GetHeadings() "{{{ Get headings
         if momlnum <= cur_cursor
             let n = len(toclst) + 1
         endif
-        let secnum = ''
-        if hlevel == 1
-            let secnum .=sec1 . ". "
-        else
-            for li in range(1, hlevel)
-                if li != hlevel
-                    execute 'let secnum .=sec' . li . ' . "."'
-                else
-                    execute 'let secnum .=sec' . li . ' . " "'
-                endif
-            endfor
-        endif
-        let tail = matchstr(line, '^\s*[#[:digit:].]\+\s\zs.*')
-        call add(toclst, [heading, tail, momlnum, repeat(' ', (3 * (hlevel - 1))) . secnum])
-        " real line: heading(0) + tail(1). momlnum(2): file_mom current line number in Mom window. secnum(3): section number.
+        let secnum = sec1
+        for li in range(1, hlevel)
+            if li == 1
+                let secnum = sec1
+            else
+                execute 'let secnum .= "." . sec' . li
+            endif
+        endfor
+        let heading = matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s\{2}')
+        let tail = matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\s\{2}\zs.*')
+        call add(toclst, [heading, tail, momlnum, secnum . '  ', repeat(' ', (hlevel - 1)) . secnum . ' '])
+        " real line: heading(0) + tail(1). momlnum(2): file_mom current line number in Mom window. secnum(3): section number, display secnum(4): use in toc win to display.
     endfor
     return [toclst, n] " n: curren section
 endfunction "}}}
 
 function Ywtxt_OpenTOC() "{{{ Open and refresh toc.
-    let toc = <SID>Ywtxt_GetHeadings()
+    let toclst = <SID>Ywtxt_GetHeadings()
     let tocwp = match(bufname(""), '_.*_TOC_') + 1 " Detect if toc(1) or mom(0) window
     if tocwp " For toc window
         let cur_cursor = line('.')
@@ -136,9 +128,9 @@ function Ywtxt_OpenTOC() "{{{ Open and refresh toc.
         let filelst = getbufline("", 1, '$')
         let bufnr = bufnr("")
         let bufname = expand("%:t:r")
-        let cur_cursor = toc[1]
+        let cur_cursor = toclst[1]
     endif
-    let toc_len = len(toc[0])
+    let toc_len = len(toclst[0])
     if tocwp == 0 " For mom window
         let bufwnr = bufwinnr('_' . bufname . '_TOC_')
         if bufwnr == -1
@@ -158,7 +150,7 @@ function Ywtxt_OpenTOC() "{{{ Open and refresh toc.
     endif
     let toclns = []
     for l in range(toc_len)
-        call add(toclns, toc[0][l][3] . toc[0][l][1])
+        call add(toclns, toclst[0][l][4] . toclst[0][l][1])
     endfor
     setlocal modifiable
     %d
@@ -174,11 +166,11 @@ function Ywtxt_CreateHeading(l) "{{{ Create Heading.
         let ln = line('.')
     endif
     if (fl + a:l) > 1
-        let heading = repeat(' ', (3 * (foldlevel(".") + a:l - 1))) . repeat('#.', (foldlevel(".") + a:l - 1)) . '#'
+        let heading = repeat('#.', (foldlevel(".") + a:l - 1)) . '#  '
     else
-        let heading = '#.'
+        let heading = '#  '
     endif
-    execute ln . "put ='" . heading . " '"
+    execute ln . "put ='" . heading . "'"
     normal zv
     startinsert!
 endfunction "}}}
@@ -201,8 +193,8 @@ function Ywtxt_toc_cmd(op,pos,...) "{{{ command on mom file in toc window.
         silent call <SID>Ywtxt_ToHtml()
         return
     elseif a:op == 'syncheading' " Sync with the heading number.
-        let toc = <SID>Ywtxt_GetHeadings()
-        for l in toc[0]
+        let toclst = <SID>Ywtxt_GetHeadings()
+        for l in toclst[0]
             call setline(l[2], l[3] . l[1])
         endfor
     elseif a:op == 'genrefs' " Generate Bibliography.
@@ -216,7 +208,7 @@ endfunction "}}}
 
 function Ywtxt_ReIndent(d) "{{{ Reindent
     " a:d: direction
-    let toc = <SID>Ywtxt_GetHeadings()
+    let toclst = <SID>Ywtxt_GetHeadings()
     let startline=line(".")
     let curln = startline + 1
     let prevlevel = foldlevel(startline - 1)
@@ -229,29 +221,11 @@ function Ywtxt_ReIndent(d) "{{{ Reindent
     call Ywtxt_WinJump(1)
     let save_cursor = getpos(".")
     let n = 1
-    for i in toc[0][startline - 1 : curln - 1]
-        if a:d == 'l'
-            if n == 1
-                if level == 2
-                    call setline(i[2], substitute(i[3] . i[1], '^\s*[#[:digit:].]*', '#.', ''))
-                elseif level > 1
-                    call setline(i[2], substitute(i[3] . i[1], '^\s*\zs\s\{3\}\%(#\|\d\+\)\.\ze', '', ''))
-                endif
-                let n += 1
-            else
-                call setline(i[2], substitute(i[3] . i[1], '^\s*\zs\s\{3\}\%(#\|\d\+\)\.\ze', '', ''))
-            endif
+    for i in toclst[0][startline - 1 : curln - 1]
+        if a:d == 'l' && level > 1
+            call setline(i[2], substitute(i[3] . i[1], '^\%(#\|\d\+\)\.', '', ''))
         elseif a:d == 'r' && (level <= prevlevel)
-            if n == 1
-                if level == 1
-                    call setline(i[2], substitute(i[3] . i[1], '^\%(#\|\d\+\)\.\ze\s', repeat(' ', 3 ) . '#.#', ''))
-                else
-                    call setline(i[2], substitute(i[3] . i[1], '^\s*\zs\ze\S', repeat(' ', 3 ) . '#.', ''))
-                endif
-                let n += 1
-            else
-                call setline(i[2], substitute(i[3] . i[1], '^\s*\zs\ze\S', repeat(' ', 3 ) . '#.', ''))
-            endif
+            call setline(i[2], substitute(i[3] . i[1], '^\ze', '#.', ''))
         endif
     endfor
     call setpos('.', save_cursor)
@@ -430,12 +404,15 @@ function Ywtxt_keymaps() "{{{ key maps.
         imap <buffer> _ _{}<Left>
         imap <buffer> ^{ ^{}<Left>
         imap <buffer> ^[ ^[]<Left>
+        nmap <silent> <buffer> <Leader>I :call Ywtxt_InsertSnip()<CR>
     else " For toc window
+        nmap <silent> <buffer> J jzx:call Ywtxt_WinJump(1)<CR>zx:wincmd p<CR>
+        nmap <silent> <buffer> K kzx:call Ywtxt_WinJump(1)<CR>zx:wincmd p<CR>
         nmap <silent> <buffer> q :bwipeout<CR>
         nmap <silent> <buffer> r :call Ywtxt_OpenTOC()<CR>
         nmap <silent> <buffer> <Space> zz:call Ywtxt_WinJump(1) <bar> wincmd p<CR>
         nmap <silent> <buffer> <Enter> :call Ywtxt_WinJump(1)<CR>
-        nmap <silent> <buffer> <s-x> zx:call Ywtxt_WinJump(1)<CR>zx:wincmd p<CR>
+        nmap <silent> <buffer> X zx:call Ywtxt_WinJump(1)<CR>zx:wincmd p<CR>
         nmap <silent> <buffer> x :call Ywtxt_WinJump(2)<CR>
         nmap <silent> <buffer> <leader>< :call Ywtxt_ReIndent('l')<CR>
         nmap <silent> <buffer> <leader>> :call Ywtxt_ReIndent('r')<CR>
@@ -443,9 +420,9 @@ function Ywtxt_keymaps() "{{{ key maps.
         nmap <silent> <buffer> <c-r> :call Ywtxt_toc_cmd('redo', 0)<CR>
         nmap <silent> <buffer> w :call Ywtxt_toc_cmd('save', 0)<CR>
         nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr(b:ywtxt_toc_mom_bufnr) . 'wincmd w'<CR>
-        nmap <silent> <buffer> <s-s> :call Ywtxt_toc_cmd('syncheading', 0)<CR>
-        nmap <silent> <buffer> <s-b> :call Ywtxt_toc_cmd('genrefs', 0)<CR>
-        nmap <silent> <buffer> <s-e> :call Ywtxt_toc_cmd('2html', 2)<CR>
+        nmap <silent> <buffer> S :call Ywtxt_toc_cmd('syncheading', 0)<CR>
+        nmap <silent> <buffer> B :call Ywtxt_toc_cmd('genrefs', 0)<CR>
+        nmap <silent> <buffer> E :call Ywtxt_toc_cmd('2html', 2)<CR>
     endif
 endfunction "}}}
 
@@ -485,6 +462,73 @@ function Ywtxt_Tab(k) "{{{ Function for <enter>
     endif
 endfunction "}}}
 
+function Ywtxt_InsertSnip() "{{{ Insert snip.
+    echohl ModeMsg
+    let ftsnip = input("snip type: ", "", "customlist,Ywtxt_ListFt")
+    echohl None
+    execute 'normal o% BEGINSNIP ' . ftsnip
+    execute 'normal o% ENDSNIP'
+    normal O
+    call <SID>Ywtxt_SynSnip(ftsnip)
+    startinsert
+endfunction "}}}
+
+function Ywtxt_FindSnipft() "{{{ Check the Snip filetypes
+    let save_cursor = getpos(".")
+    normal gg
+    let snipl = searchpos('^\s*% BEGINSNIP ', 'W')[0]
+    let snipdic = {}
+    while snipl
+        let snipname = matchstr(getline(snipl), '^\s*% BEGINSNIP \zs\S\+')
+        let snipdic[snipname] = 1
+        let snipl = searchpos('^\s*% BEGINSNIP', 'W')[0]
+    endwhile
+    for snip in keys(snipdic)
+        call <SID>Ywtxt_SynSnip(snip)
+    endfor
+    call setpos('.', save_cursor)
+endfunction "}}}
+
+function s:Ywtxt_SynSnip(ftsnip,...) "{{{ Syntax for snip
+    if !exists('b:ywtxt_ftsnipsdic')
+        let b:ywtxt_ftsnipsdic = {}
+    endif
+    if !has_key(b:ywtxt_ftsnipsdic, a:ftsnip)
+        let begin = '^\s*% BEGINSNIP ' . a:ftsnip
+        let end = '^\s*% ENDSNIP'
+        if exists("a:1")
+            let begin = a:1
+        endif
+        if exists("a:2")
+            let end = a:2
+        endif
+        if exists("b:current_syntax")
+            let oldcurrent_syntax = b:current_syntax
+            unlet b:current_syntax
+        endif
+        execute 'syntax include @ywtxt_' . a:ftsnip . ' syntax/' . a:ftsnip . '.vim'
+        execute 'syntax region ywtxt_' . a:ftsnip . 'Snip matchgroup=Comment start="' . begin . '" end="' . end . '" contains=@ywtxt_' . a:ftsnip
+        let b:ywtxt_ftsnipsdic[a:ftsnip] = ''
+        unlet b:current_syntax
+        if exists("oldcurrent_syntax")
+            let b:current_syntax = oldcurrent_syntax
+        endif
+    endif
+endfunction "}}}
+
+function Ywtxt_ListFt(A,L,P) "{{{ Completion func for snip filetypes to insert in cmdline
+    let comp = {}
+    for p in split(&runtimepath, ',')
+        for f in split(globpath(p.'/syntax/', '*.vim'), '\n')
+            let ft = matchstr(f, '[^/]*\ze\.vim$')
+            if match(ft, '^'.a:L) != -1
+                let comp[ft] = ''
+            endif
+        endfor
+    endfor
+    return keys(comp)
+endfunction "}}}
+
 function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html
     call <SID>Ywtxt_GetRefLst()
     normal zR
@@ -496,12 +540,11 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html
         let le = line('$')
     endif
     execute ls . ',' . le . 'TOhtml'
-    %s/^\%(<[^>]*>\)*\(\%(#\|\d\+\)\.\s[^<]*\)\ze</<h1>\1<\/h1>/e " heading
-    for i in range(1, 3)
-        execute '%s/^\%(<[^>]*>\)*\(\%(\%(#\|\d\+\)\.\)\{' . i . '\}\%(#\|\d\+\)\s[^<]*\)\ze</<h' . (i + 1) . '>\1<\/h' . (i + 1) . '>/e'
+    for i in range(1, 4) " Headings
+        execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (i-1) . '}\%(#\|\d\+\)&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
     endfor
-    %s/^\%(<[^>]*>\)*\(\%(\%(#\|\d\+\)\.\)\{4,\}\%(#\|\d\+\)\s[^<]*\)\ze</<h4>\1<\/h4>/e
-    g/<b>\s*%[^<]*<\/b>/d " Delete the comment line
+    %s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{4,}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e
+    g/^\%(<[^>]\+>\)*\%(&nbsp;\)*\s*%/d " Delete the comment line
     %s/<b>\zs\*\([^<]*\)\*\ze</\1/ge " boldface
     %s/<i>\zs\/\([^<]*\)\/\ze</\1/ge " italic
     %s/<u>\zs_\([^<]*\)_\ze</\1/ge " underlined
@@ -517,24 +560,26 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html
 endfunction "}}}
 " command -bar -range=% YwtxtTOhtml call Ywtxt_ToHtml(<line1>,<line2>)
 
-function Ywtxt_Indent() "{{{ Indent func.
-    let line = getline('.')
-    let headingp = <SID>Ywtxt_HeadingP(line)
-    if headingp[0]
-        return (3 * (headingp[1] - 1))
-    else
-        return (3 * foldlevel('.'))
-    endif
-endfunction "}}}
-
-function Ywtxt_old2new() "{{{ TODO Old to new, will delete soon!
+function Ywtxt_old2new() "{{{ 0.10 -> 0.11 TODO Old to new, will delete soon!
     for l in range(1, line('$'))
         let line = getline(l)
-        if match(line, '^\%(\%(#\|\d\+\)\.\)\+\%\(#\|\d\+\)\ze\.\s') == 0
-            let head = matchstr(line, '^\%(\%(#\|\d\+\)\.\)\+\%\(#\|\d\+\)\ze\.\s')
-            let tail = matchstr(line, '^[#[:digit:].]\+\zs\s.*')
-            let level = len(split(head, '\.'))
-            call setline(l, repeat(' ', 3 * (level - 1)) . head . tail)
+        let heading = matchstr(line, '^\%(#\|\d\+\)\ze\.\s')
+        if heading != ''
+            let tail = matchstr(line, '^\s*[#[:digit:].]\+\s\zs.*')
+            call setline(l, heading . '  ' . tail)
+            continue
+        endif
+        let indent = strlen(matchstr(line, '^\s*'))
+        let match_heading_indent = indent
+        if indent % 3 != 0
+            continue
+        endif
+        let match_heading_indent = indent / 3
+        let match_heading_num = len(split(matchstr(line, '^\s*\zs\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\ze\s'), '\.'))
+        if (match_heading_indent + 1) == match_heading_num
+            let head = matchstr(line, '^\s*\zs\%(\%(#\|\d\+\)\.\)\+\%\(#\|\d\+\)\ze\s')
+            let tail = matchstr(line, '^\s*[#[:digit:].]\+\s\zs.*')
+            call setline(l, head . '  ' . tail)
         endif
     endfor
 endfunction
