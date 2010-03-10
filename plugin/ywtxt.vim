@@ -25,13 +25,13 @@ endif
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
 
-function s:Ywtxt_HeadingP(l, ...) "{{{ Determine if it's heading.
+function s:Ywtxt_HeadingP(l,...) "{{{ Determine if it's heading.
     " a:1: == 1: force to assure current window is mom window.
     let line = a:l
-    if (match(bufname(""), '_.*_TOC_') + 1) || (exists("a:1") && a:1 != 1) " Detect if toc(1) or mom(0) window
-        let match_heading_num = len(split(matchstr(line, '^\s*\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s'), '\.'))
-    else
+    if match(bufname(""), '_.*_TOC_') == -1 || exists("a:1") " mom window
         let match_heading_num = len(split(matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s\{2}'), '\.'))
+    else
+        let match_heading_num = len(split(matchstr(line, '^\s*\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s'), '\.'))
     endif
     return match_heading_num
 endfunction "}}}
@@ -60,7 +60,7 @@ function Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
         if bufwinnr
             let l = toclst[0][line('.') - 1][2]
             execute bufwinnr . 'wincmd w'
-            execute 'normal ' . l . 'Gzv'
+            execute 'normal ' . l . 'Gzvzz'
         endif
         if a:n == 2
             execute 'bwipeout ' . bufnr
@@ -88,40 +88,36 @@ function s:Ywtxt_GetHeadings() "{{{ Get headings
         let momlnum += 1
         let hlevel = <SID>Ywtxt_HeadingP(line, 1)
         if hlevel
-            let hlevel = hlevel
-        else
-            continue
-        endif
-        " number generating
-        if !exists("sec" . hlevel) || (secmaxlev < hlevel)
-            execute 'let sec' . hlevel . '=1'
-        else
-            execute 'let sec' . hlevel . '+=1'
-        endif
-        let secmaxlev = hlevel
-        if momlnum <= cur_cursor
-            let n = len(toclst) + 1
-        endif
-        let secnum = sec1
-        for li in range(1, hlevel)
-            if li == 1
-                let secnum = sec1
+            " number generating
+            if !exists("sec" . hlevel) || (secmaxlev < hlevel)
+                execute 'let sec' . hlevel . '=1'
             else
-                execute 'let secnum .= "." . sec' . li
+                execute 'let sec' . hlevel . '+=1'
             endif
-        endfor
-        let heading = matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s\{2}')
-        let tail = matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\s\{2}\zs.*')
-        call add(toclst, [heading, tail, momlnum, secnum . '  ', repeat(' ', (hlevel - 1)) . secnum . ' '])
-        " real line: heading(0) + tail(1). momlnum(2): file_mom current line number in Mom window. secnum(3): section number, display secnum(4): use in toc win to display.
+            let secmaxlev = hlevel
+            if momlnum <= cur_cursor
+                let n = len(toclst) + 1
+            endif
+            let secnum = sec1
+            for li in range(1, hlevel)
+                if li == 1
+                    let secnum = sec1
+                else
+                    execute 'let secnum .= "." . sec' . li
+                endif
+            endfor
+            let heading = matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s\{2}')
+            let tail = matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\s\{2}\zs.*')
+            call add(toclst, [heading, tail, momlnum, secnum . '  ', repeat('  ', (hlevel - 1)) . secnum . ' '])
+            " real line: heading(0) + tail(1). momlnum(2): file_mom current line number in Mom window. secnum(3): section number, display secnum(4): use in toc win to display.
+        endif
     endfor
     return [toclst, n] " n: curren section
 endfunction "}}}
 
 function Ywtxt_OpenTOC() "{{{ Open and refresh toc.
     let toclst = <SID>Ywtxt_GetHeadings()
-    let tocwp = match(bufname(""), '_.*_TOC_') + 1 " Detect if toc(1) or mom(0) window
-    if tocwp " For toc window
+    if match(bufname(""), '_.*_TOC_') == 0
         let cur_cursor = line('.')
         let filelst = getbufline(b:ywtxt_toc_mom_bufnr, 1, '$')
     else " For mom window
@@ -129,9 +125,6 @@ function Ywtxt_OpenTOC() "{{{ Open and refresh toc.
         let bufnr = bufnr("")
         let bufname = expand("%:t:r")
         let cur_cursor = toclst[1]
-    endif
-    let toc_len = len(toclst[0])
-    if tocwp == 0 " For mom window
         let bufwnr = bufwinnr('_' . bufname . '_TOC_')
         if bufwnr == -1
             let tocwidth = (winwidth(bufwinnr(bufnr)) / 4)
@@ -148,6 +141,7 @@ function Ywtxt_OpenTOC() "{{{ Open and refresh toc.
             execute bufwnr . 'wincmd w'
         endif
     endif
+    let toc_len = len(toclst[0])
     let toclns = []
     for l in range(toc_len)
         call add(toclns, toclst[0][l][4] . toclst[0][l][1])
@@ -322,11 +316,6 @@ function s:Ywtxt_GetBibEntry(...) " {{{ Show bib entry
                 else
                     let entryshow .= bibentriesdic[entry] . '. '
                 endif
-                " else
-                "     echo "\n"
-                "     for entrylst in split(bibentriesdic[entry] . '. ', "\n")
-                "         echo entrylst
-                "     endfor
             endif
         endif
     endfor
@@ -336,13 +325,12 @@ function s:Ywtxt_GetBibEntry(...) " {{{ Show bib entry
         echohl ErrorMsg
         echo entryshow
         echohl None
-        " call append('$', [entry . ': ' . bibentriesdic[entry], ""])
     endif
 endfunction "}}}
 
 function s:Ywtxt_GenBibliography() "{{{ Generate bibliography.
     let save_cursor = getpos(".")
-    let refsi = searchpos('^\s*[#[:digit:].]\+\s' . s:ywtxt_biblioname, 'nw')[0]
+    let refsi = searchpos('^\s*[#[:digit:].]\+\s\s' . s:ywtxt_biblioname, 'nw')[0]
     let refei = searchpos('^\s*% bibfile = ', 'nw')[0]
     if (refsi == 0) || (refei == 0) || (refei < (refsi + 1))
         echohl ErrorMsg
@@ -406,13 +394,13 @@ function Ywtxt_keymaps() "{{{ key maps.
         imap <buffer> ^[ ^[]<Left>
         nmap <silent> <buffer> <Leader>I :call Ywtxt_InsertSnip()<CR>
     else " For toc window
-        nmap <silent> <buffer> J jzx:call Ywtxt_WinJump(1)<CR>zx:wincmd p<CR>
-        nmap <silent> <buffer> K kzx:call Ywtxt_WinJump(1)<CR>zx:wincmd p<CR>
+        nmap <silent> <buffer> J jzMzv:call Ywtxt_WinJump(1)<CR>zMzv:wincmd p<CR>
+        nmap <silent> <buffer> K kzMzv:call Ywtxt_WinJump(1)<CR>zMzv:wincmd p<CR>
         nmap <silent> <buffer> q :bwipeout<CR>
         nmap <silent> <buffer> r :call Ywtxt_OpenTOC()<CR>
-        nmap <silent> <buffer> <Space> zz:call Ywtxt_WinJump(1) <bar> wincmd p<CR>
+        nmap <silent> <buffer> <Space> :call Ywtxt_WinJump(1) <bar> wincmd p<CR>
         nmap <silent> <buffer> <Enter> :call Ywtxt_WinJump(1)<CR>
-        nmap <silent> <buffer> X zx:call Ywtxt_WinJump(1)<CR>zx:wincmd p<CR>
+        nmap <silent> <buffer> X zMzv:call Ywtxt_WinJump(1)<CR>zMzv:wincmd p<CR>
         nmap <silent> <buffer> x :call Ywtxt_WinJump(2)<CR>
         nmap <silent> <buffer> <leader>< :call Ywtxt_ReIndent('l')<CR>
         nmap <silent> <buffer> <leader>> :call Ywtxt_ReIndent('r')<CR>
