@@ -33,7 +33,7 @@ function s:Ywtxt_HeadingP(l) "{{{ Determine if it's heading.
     endif
     let indent = strlen(matchstr(line, '^\s*'))
     if indent % 3 != 0
-        continue
+        return [0, 0]
     endif
     let match_heading_indent = indent / 3
     let match_heading_num = len(split(matchstr(line, '^\s*\zs\%(\%(#\|\d\+\)\.\)\+\%(#\|\d\+\)\ze\s'), '\.'))
