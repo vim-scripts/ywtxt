@@ -28,7 +28,7 @@ let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html;
 function s:Ywtxt_HeadingP(l, ...) "{{{ Determine if it's heading.
     " a:1: == 1: force to assure current window is mom window.
     let line = a:l
-    if match(bufname(""), '_.*_TOC_') + 1 || !exists("a:1") " Detect if toc(1) or mom(0) window
+    if (match(bufname(""), '_.*_TOC_') + 1) || (exists("a:1") && a:1 != 1) " Detect if toc(1) or mom(0) window
         let match_heading_num = len(split(matchstr(line, '^\s*\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s'), '\.'))
     else
         let match_heading_num = len(split(matchstr(line, '^\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze\s\{2}'), '\.'))

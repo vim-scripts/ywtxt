@@ -36,7 +36,7 @@ highlight ywtxt_italic term=italic cterm=italic gui=italic
 syntax match ywtxt_heading0 /^\%(#\|\d\+\)\.\s\+.*/ contains=ALL
 if match(bufname(""), '_.*_TOC_') == 0 " For toc window
   for i in range(1,10)
-    execute 'syntax match ywtxt_heading'.i.' /^\s\{' . i . '\}\%(\%(#\|\d\+\)\.\)\{'.i.'\}\%(#\|\d\+\)\s\+.*/ contains=CONTAINED'
+    execute 'syntax match ywtxt_heading'.i.' /^\s\{' . (i - 1) . '\}\%(\%(#\|\d\+\)\.\)\{'.(i - 1).'}\%(#\|\d\+\)\s.*/ contains=CONTAINED'
   endfor
 else " For mom window
   call Ywtxt_FindSnipft()
