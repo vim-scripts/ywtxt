@@ -51,7 +51,7 @@ function Ywtxt_SearchHeadingPat() "{{{ search heading patten
     if cus_headings == ''
         return
     endif
-    let headingslst = split(cus_headings, '\s\+')
+    let headingslst = split(cus_headings, '[''"]\zs\s\+\ze[''"]')
     if len(headingslst) == 0
         return
     endif
