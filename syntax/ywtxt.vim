@@ -6,6 +6,9 @@ if exists("b:current_syntax")
   finish
 endif
 
+syntax match ywtxt_title /\%^\_.\{-}\zs\s\+\zs\S.*\ze\s\+$/ contains=ALL
+highlight default link ywtxt_title Title
+
 syntax keyword ywtxt_done DONE
 highlight default link ywtxt_done Comment
 syntax keyword ywtxt_todo FIXME TODO
@@ -19,9 +22,9 @@ highlight default link ywtxt_ref Comment
 syntax match ywtxt_comment '^\s*%.*$' contains=ALL
 highlight default link ywtxt_comment Comment
 
-syntax match ywtxt_Fig '^\s*Fig\(\.\|ure\)\s\(#\|\d\+\)\.\s'
+syntax match ywtxt_Fig '^\s*\cFig\(\.\|ure\)\s\(#\|\d\+\)\.\s\s'
 highlight default link ywtxt_Fig Comment
-syntax match ywtxt_Tab '^\s*Table\s\(#\|\d\+\)'
+syntax match ywtxt_Tab '^\s*\cTable\s\(#\|\d\+\)\.\s\s'
 highlight default link ywtxt_Tab Comment
 
 syntax match ywtxt_bold '\%([[:punct:]]\|\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\([[:punct:]]\|\s\|$\)'
@@ -33,17 +36,8 @@ highlight ywtxt_underline term=underline cterm=underline gui=underline
 syntax match ywtxt_italic '\%([[:punct:]]\|\s\|^\)\zs/[^[:blank:]/]\+/\ze\([[:punct:]]\|\s\|$\)'
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
-syntax match ywtxt_heading0 /^\%(#\|\d\+\)\.\s\+.*/ contains=ALL
-if match(bufname(""), '_.*_TOC_') == 0 " For toc window
-  for i in range(1,10)
-    execute 'syntax match ywtxt_heading'.i.' /^\s\{' . (2 * (i - 1)) . '\}\%(\%(#\|\d\+\)\.\)\{'.(i - 1).'}\%(#\|\d\+\)\s.*/ contains=CONTAINED'
-  endfor
-else " For mom window
-  call Ywtxt_FindSnipft()
-  for i in range(1,10)
-    execute 'syntax match ywtxt_heading'.i.' /^\%(\%(#\|\d\+\)\.\)\{' . (i - 1) . '}\%(#\|\d\+\)\s\{2}.*/ contains=CONTAINED'
-  endfor
-endif
+call Ywtxt_HeadingPat()
+
 if &background == "dark"
   highlight ywtxt_heading1 ctermfg=blue cterm=bold guifg=LightSkyBlue gui=bold
   highlight ywtxt_heading2 ctermfg=yellow cterm=bold guifg=LightGoldenrod gui=bold
