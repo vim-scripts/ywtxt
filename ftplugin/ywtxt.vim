@@ -12,6 +12,7 @@ else " For mom window
     setlocal textwidth=72
 endif
 
-call Ywtxt_SearchHeadingPat()
+setlocal comments=":%"
+
 call Ywtxt_FindSnipft()
 call Ywtxt_keymaps()

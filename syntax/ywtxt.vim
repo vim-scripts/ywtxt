@@ -6,6 +6,8 @@ if exists("b:current_syntax")
   finish
 endif
 
+call Ywtxt_SearchHeadingPat()
+
 syntax match ywtxt_title /\%^\_.\{-}\zs\s\+\zs\S.*\ze\s\+$/ contains=ALL
 highlight default link ywtxt_title Title
 

@@ -8,8 +8,6 @@ endif
 let s:loaded_ywtxt = 1
 scriptencoding utf-8
 
-setlocal comments=":%"
-
 let s:ywtxt_path = expand("<sfile>:p:h")
 
 " User vars:
@@ -24,6 +22,29 @@ if exists("g:ywtxt_tocwidth")
 endif
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
+
+function s:Ywtxt_ReturnPairRegion(t) "{{{ Return pair region line numbers.
+    let save_cursor = getpos(".")
+    let leftlist = []
+    let rightlist = []
+    if a:t == 'ref'
+        let pat = '^\%([#[:digit:].]\+\)\s\s'
+        if exists("b:ywtxt_cus_headingslst")
+            for i in range(len(b:ywtxt_cus_headingslst[:-2]))
+                let pat = pat[:-7] . '\|' . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . pat[-6:]
+            endfor
+        endif
+        let lp = pat . s:ywtxt_biblioname
+        let rp = '^% bibfile = '
+    elseif a:t == 'snip'
+        let lp = '^\s*% BEGINSNIP\s'
+        let rp = '^\s*% ENDSNIP'
+    endif
+    execute 'silent g/' . lp . '/call add(leftlist, line("."))'
+    execute 'silent g/' . rp . '/call add(rightlist, line("."))'
+    call setpos('.', save_cursor)
+    return [leftlist, rightlist]
+endfunction "}}}
 
 function Ywtxt_SearchHeadingPat() "{{{ search heading patten
     let cus_headings = matchstr(getline(searchpos('^% HEADINGS ', 'cnw')[0]), '^\s*% HEADINGS\s\+\zs.*\ze\s*$')
@@ -53,7 +74,7 @@ function s:Ywtxt_ReturnHeadingName(l) "{{{ Get heading name.
 endfunction "}}}
 
 function s:Ywtxt_HeadingP(l,...) "{{{ Return the heading level, 0 if not.
-    " a:1: == 1: force to assure current window is mom window.
+    " a:1 == 1: force to assure current window is mom window.
     let line = a:l
     if match(bufname(""), '_.*_TOC_') == -1 || exists("a:1") " mom window
         let head = '^'
@@ -489,44 +510,35 @@ endfunction "}}}
 
 function s:Ywtxt_GenBibliography() "{{{ Generate bibliography.
     let save_cursor = getpos(".")
-    let pat = '^\%([#[:digit:].]\+\)\s\s'
-    if exists("b:ywtxt_cus_headingslst")
-        for i in range(len(b:ywtxt_cus_headingslst[:-2]))
-            let pat = pat[:-7] . '\|' . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . pat[-6:]
-        endfor
-    endif
-    let refslst = []
-    let refelst = []
-    execute 'silent g/' . pat . s:ywtxt_biblioname . '/call add(refslst, line("."))'
-    silent g/^% bibfile = /call add(refelst, line('.'))
-    let refsnum = len(refslst)
+    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref')
+    let refsnum = len(refslnlst[0])
     if refsnum == 0
         return
     endif
     setlocal nofoldenable
     for i in range(refsnum)
-        if (refslst[i] == 0) || (refelst[i] == 0) || (refelst[i] < (refslst[i] + 1))
+        if (refslnlst[0][i] == 0) || (refslnlst[1][i] == 0) || (refslnlst[1][i] < (refslnlst[0][i] + 1))
             echohl ErrorMsg | echo "The section " . refsnum . " references not found, see the document to make .bib support work." | echohl None
             return
         endif
         if i == 0
             let ls = 1
         else
-            let ls = refelst[i-1]
+            let ls = refslnlst[1][i-1]
         endif
-        let le = refslst[i] - 1
+        let le = refslnlst[0][i] - 1
         let reflns = []
-        let dic <SID>Ywtxt_GetRefLst(ls, le)
+        let dic = <SID>Ywtxt_GetRefLst(ls, le)
         for l in range(1, len(dic))
             call add(reflns, '['. l . '] ' . dic[l][1])
         endfor
         let reflns = [''] + reflns + ['']
-        execute (refslst[i] + 1) . ',' . (refelst[i] - 1) . 'delete'
-        call append(refslst[i], reflns)
-        let offset = len(reflns) - refelst[i] + refslst[i] + 1
+        execute (refslnlst[0][i] + 1) . ',' . (refslnlst[1][i] - 1) . 'delete'
+        call append(refslnlst[0][i], reflns)
+        let offset = len(reflns) - refslnlst[1][i] + refslnlst[0][i] + 1
         if i < refsnum
-            let refslst[i+1] += offset
-            let refelst[i+1] += offset
+            let refslnlst[0][i+1] += offset
+            let refslnlst[1][i+1] += offset
         endif
     endfor
     setlocal foldenable
@@ -613,35 +625,24 @@ function Ywtxt_ToggleToc() "{{{ Toggle toc type
 endfunction "}}}
 
 function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
-    let pat = '^\%([#[:digit:].]\+\)\s\s'
-    if exists("b:ywtxt_cus_headingslst")
-        for i in range(len(b:ywtxt_cus_headingslst[:-2]))
-            let pat = pat[:-7] . '\|' . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . pat[-6:]
-        endfor
-    endif
-    let refslst = []
-    let refelst = []
-    let save_cursor = getpos(".")
-    execute 'silent g/' . pat . s:ywtxt_biblioname . '/call add(refslst, line("."))'
-    silent g/^% bibfile = /call add(refelst, line('.'))
-    call setpos('.', save_cursor)
-    let refsnum = len(refslst)
+    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref')
+    let refsnum = len(refslnlst[0])
     let line = getline('.')
     let lnum = line('.')
     if refsnum != 0
         for i in range(refsnum)
-            if refelst[i] < refslst[i]
+            if refslnlst[1][i] < refslnlst[0][i]
                 continue
             endif
-            if (lnum > refslst[i]) && (lnum < refelst[i])
+            if (lnum > refslnlst[0][i]) && (lnum < refslnlst[1][i])
                 let num = matchstr(line, '^\[\zs\d\+\ze\]\s')
                 if num != ''
                     if i == 0
                         let ls = 1
                     else
-                        let ls = refelst[i-1]
+                        let ls = refslnlst[1][i-1]
                     endif
-                    let le = refslst[i] - 1
+                    let le = refslnlst[0][i] - 1
                     let refsdic = <SID>Ywtxt_GetRefLst(ls, le)
                     if a:k == 't'
                         call search('\^\[[^]]*\<\zs' . refsdic[num][0] . '\>[^]]*\]', 'bW', ls)
@@ -740,7 +741,7 @@ function Ywtxt_ListFt(A,L,P) "{{{ Completion func for snip filetypes to insert i
     return keys(comp)
 endfunction "}}}
 
-function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html
+function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
     let refsdic = <SID>Ywtxt_GetRefLst(1, '$')
     normal zR
     if exists("a:1")
@@ -754,7 +755,7 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html
         let ywtxt_cus_headingslst = b:ywtxt_cus_headingslst
     endif
     execute ls . ',' . le . 'TOhtml'
-    " Headings FIXME: ugly.
+    " Headings
     if exists("ywtxt_cus_headingslst")
         let headlen = len(ywtxt_cus_headingslst) - 1
         if headlen < 4
@@ -812,7 +813,7 @@ function Ywtxt_HeadingPat() "{{{ Get patten of headings for syntax. FIXME: ugly.
             for ei in range(len(b:ywtxt_cus_headingslst), 10)
                 execute 'syntax match ywtxt_heading'. ei .' /' . head . '\%(\%(#\|\d\+\)\.\)\{'.(ei - b:ywtxt_cus_headingslst[-1] - 1).'}\%(#\|\d\+\)' . tail . '.*/ contains=CONTAINED'
             endfor
-        else
+        else " toc window
             let head = '^\s'
             let tail = '\s'
             for i in range(1, len(b:ywtxt_cus_headingslst) - 1)
