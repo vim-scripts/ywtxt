@@ -112,7 +112,7 @@ function Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
         let bufnr = bufnr(bufname(""))
         let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
         if bufwinnr
-            let l = toclst[0][line('.') - 2][2]
+            let l = toclst[0][line('.') - 2][2] " Why 2? toc window's first line is for displaying.
             execute bufwinnr . 'wincmd w'
             execute 'normal ' . l . 'Gzvzz'
         endif
@@ -237,7 +237,7 @@ function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
         let filelst = getbufline("", 1, '$')
         let bufnr = bufnr("")
         let bufname = expand("%:t:r")
-        let cur_cursor = toclst[1]
+        let cur_cursor = toclst[1] + 1
         let bufwnr = bufwinnr('_' . bufname . '_TOC_')
         if bufwnr == -1
             let tocwidth = (winwidth(bufwinnr(bufnr)) / 4)
@@ -263,7 +263,7 @@ function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
         endif
     endif
     let toc_len = len(toclst[0])
-    let toclns = ["§ " . a:t]
+    let toclns = ["§ " . a:t] " cur_cursor
     syntax match ywtxt_toc_title /\%^\_.\{-}\zs§ .*$/
     highlight default link ywtxt_toc_title Title
     for l in range(toc_len)
@@ -371,7 +371,7 @@ function Ywtxt_ReIndent(d) "{{{ Reindent
     call Ywtxt_WinJump(1)
     let save_cursor = getpos(".")
     let n = 1
-    for i in toclst[0][startline - 1 : curln - 1]
+    for i in toclst[0][startline - 2 : curln - 2] " why 2? toc window's first line is for display only.
         if a:d == 'l' && level > 1
             call setline(i[2], <SID>Ywtxt_ReturnHeadingName(i[5] - 1) . '  ' . i[1])
         elseif a:d == 'r' && (level <= prevlevel)
