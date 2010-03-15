@@ -26,6 +26,7 @@ if exists("g:ywtxt_HeadingsPat")
 endif
 
 let s:ywtxt_toc_title_h = 2
+let s:ywtxt_def_headingpat = '\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)'
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
 
@@ -34,12 +35,14 @@ function s:Ywtxt_ReturnPairRegion(t) "{{{ Return pair region line numbers.
     let leftlist = []
     let rightlist = []
     if a:t == 'ref'
-        let pat = '^\%([#[:digit:].]\+\)\s\s'
+        let pat = s:ywtxt_def_headingpat
+        let pat_mid = ''
         if exists("b:ywtxt_cus_headingslst")
             for i in range(len(b:ywtxt_cus_headingslst[:-2]))
-                let pat = pat[:-7] . '\|' . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . pat[-6:]
+                let pat_mid .= '\|' . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\%(\\d\\+\\|#\\)', '')
             endfor
         endif
+        let pat = '^\%(' . pat . pat_mid . '\)\s\s'
         let lp = pat . s:ywtxt_biblioname
         let rp = '^% bibfile = '
     elseif a:t == 'snip'
@@ -106,13 +109,13 @@ function s:Ywtxt_HeadingP(l,...) "{{{ Return the heading level, 0 if not.
         let head = '^\s*'
         let tail = '\s'
     endif
-    let headinglen = len(split(matchstr(line, head . '\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)\ze' . tail), '\.'))
+    let headinglen = len(split(matchstr(line, head . s:ywtxt_def_headingpat . '\ze' . tail), '\.'))
     if exists("b:ywtxt_cus_headingslst")
         if headinglen >= b:ywtxt_cus_headingslst[-1]
             return len(b:ywtxt_cus_headingslst[:-2]) + headinglen - 1
         else
             for i in range(len(b:ywtxt_cus_headingslst[:-2]))
-                if match(line, head . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . tail) == 0
+                if match(line, head . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . tail) == 0
                     return (i + 1)
                 endif
             endfor
@@ -256,24 +259,24 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
                     endif
                 endfor
             endif
-            let heading = matchstr(line, '^\(.\{-}\ze\s\s\)\{1}')
-            let tail = matchstr(line, '^\(.\{-}\s\s\)\{1}\zs.*')
+            let heading = matchstr(line, '^\%(.\{-}\ze\s\s\)\{1}')
+            let tail = matchstr(line, '^\%(.\{-}\s\s\)\{1}\zs.*')
             let realsecnum = secnum . '  '
             let displaysecnum = repeat('  ', (hlevel - 1)) . secnum . ' '
         else
             if a:t == 'Figure'
                 " Figure TOC gerneration
-                let pat = '^\s*\cFig\(\.\|ure\)\s\(#\|\d\+\)\.\ze\s\s'
+                let pat = '^\s*\cFig\%(\.\|ure\)\s\%(#\|\d\+\)\.\ze\s\s'
             elseif a:t == 'Table'
                 " Table TOC gerneration
-                let pat = '^\s*\cTable\s\(#\|\d\+\)\.\ze\s\s'
+                let pat = '^\s*\cTable\s\%(#\|\d\+\)\.\ze\s\s'
             endif
             let heading = matchstr(line, pat)
             if heading == ''
                 continue
             endif
             let hlevel = 1
-            let tail = matchstr(line, '^\(.\{-}\s\s\)\{1}\zs.*')
+            let tail = matchstr(line, '^\%(.\{-}\s\s\)\{1}\zs.*')
             let realsecnum = ''
             let displaysecnum = heading . ' '
         endif
@@ -499,7 +502,7 @@ function s:Ywtxt_GetBibEntry(...) " {{{ Show bib entry
         if (key != 13) || (key != 32)
             " 13: enter, 32: space
             if exists("*Ywrun_run")
-                if match(bibfile, '\(/\|\d:\)') == 0
+                if match(bibfile, '\%(/\|\d:\)') == 0
                     silent! call Ywrun_run(expand(bibentriesdic['url']))
                 else
                     silent! call Ywrun_run(matchstr(bibfile, '.*/\ze.*$') . expand(bibentriesdic['url']))
@@ -510,8 +513,8 @@ function s:Ywtxt_GetBibEntry(...) " {{{ Show bib entry
     let entryshow = ""
     for entry in ['title', 'author', 'journal', 'year', 'volume', 'number', 'pages', 'url', 'abstract', 'contents', 'note']
         if has_key(bibentriesdic, entry)
-            if entry =~ '\(title\|author\|journal\|year\|volume\|number\|pages\)'
-                if entry == '\(journal\|year\)'
+            if entry =~ '\%(title\|author\|journal\|year\|volume\|number\|pages\)'
+                if entry == '\%(journal\|year\)'
                     let entryshow .= bibentriesdic[entry] . ', '
                 elseif entry == 'volume'
                     let entryshow .= bibentriesdic[entry]
@@ -590,7 +593,7 @@ function s:Ywtxt_GetRefLst(ls, le) "{{{ Get bibs
     let biblst=[]
     execute ls . ',' . le . 'g/\^\[[^]]*\]/call add(biblines, getline("."))'
     for line in biblines
-        for bibs in filter(split(line, '\(\ze\^\[\|\]\zs\)'), "v:val =~ '\\^\\[[^]]*\\]'")
+        for bibs in filter(split(line, '\%(\ze\^\[\|\]\zs\)'), "v:val =~ '\\^\\[[^]]*\\]'")
             for bib in split(substitute(bibs[2:-2], '\s\+', '', 'g'), ',')
                 if index(biblst, bib) == -1
                     call add(biblst, bib)
@@ -639,12 +642,12 @@ function Ywtxt_keymaps() "{{{ key maps.
         nmap <silent> <buffer> x :call Ywtxt_WinJump(2)<CR>
         nmap <silent> <buffer> <leader>< :call Ywtxt_ReIndent('l')<CR>
         nmap <silent> <buffer> <leader>> :call Ywtxt_ReIndent('r')<CR>
-        nmap <silent> <buffer> u :call Ywtxt_toc_cmd('undo', 0)<CR>
-        nmap <silent> <buffer> <c-r> :call Ywtxt_toc_cmd('redo', 0)<CR>
-        nmap <silent> <buffer> w :call Ywtxt_toc_cmd('save', 0)<CR>
+        nmap <silent> <buffer> u :call Ywtxt_toc_cmd('undo', 1)<CR>
+        nmap <silent> <buffer> <c-r> :call Ywtxt_toc_cmd('redo', 1)<CR>
+        nmap <silent> <buffer> w :call Ywtxt_toc_cmd('save', 1)<CR>
         nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr(b:ywtxt_toc_mom_bufnr) . 'wincmd w'<CR>
-        nmap <silent> <buffer> S :call Ywtxt_toc_cmd('syncheading', 0)<CR>
-        nmap <silent> <buffer> B :call Ywtxt_toc_cmd('genrefs', 0)<CR>
+        nmap <silent> <buffer> S :call Ywtxt_toc_cmd('syncheading', 1)<CR>
+        nmap <silent> <buffer> B :call Ywtxt_toc_cmd('genrefs', 1)<CR>
         nmap <silent> <buffer> E :call Ywtxt_toc_cmd('2html', 2)<CR>
         nmap <silent> <buffer> A zR:call Ywtxt_WinJump(1)<CR>zR:wincmd p<CR>
     endif
@@ -672,7 +675,7 @@ function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
                 continue
             endif
             if (lnum > refslnlst[0][i]) && (lnum < refslnlst[1][i])
-                let num = matchstr(line, '^\[\zs\d\+\ze\]\s')
+                let num = matchstr(line, '^\s*\[\zs\d\+\ze\]\s')
                 if num != ''
                     if i == 0
                         let ls = 1
@@ -797,7 +800,7 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
         let headlen = len(ywtxt_cus_headingslst) - 1
         if headlen < 4
             for i in range(1, headlen)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
             endfor
             for i in range(headlen + 1, 4)
                 execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (i - ywtxt_cus_headingslst[-1] - 1) . '}\%(#\|\d\+\)&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
@@ -805,15 +808,15 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
             execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (ywtxt_cus_headingslst[-1] - 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
         elseif headlen == 4
             for i in range(1, headlen)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
             endfor
             execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (ywtxt_cus_headingslst[-1] - 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
         else
             for i in range(1, 3)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
             endfor
             for i in range(4, headlen)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
             endfor
         endif
         execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (headlen + 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
@@ -845,7 +848,7 @@ function Ywtxt_HeadingPat() "{{{ Get patten of headings for syntax. FIXME: ugly.
             let head = '^'
             let tail = '\s\s'
             for i in range(1, len(b:ywtxt_cus_headingslst) - 1)
-                execute 'syntax match ywtxt_heading' . i . ' /' . head . substitute(escape(b:ywtxt_cus_headingslst[i-1], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . tail . '.*/ contains=CONTAINED'
+                execute 'syntax match ywtxt_heading' . i . ' /' . head . substitute(escape(b:ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . tail . '.*/ contains=CONTAINED'
             endfor
             for ei in range(len(b:ywtxt_cus_headingslst), 10)
                 execute 'syntax match ywtxt_heading'. ei .' /' . head . '\%(\%(#\|\d\+\)\.\)\{'.(ei - b:ywtxt_cus_headingslst[-1] - 1).'}\%(#\|\d\+\)' . tail . '.*/ contains=CONTAINED'
@@ -854,7 +857,7 @@ function Ywtxt_HeadingPat() "{{{ Get patten of headings for syntax. FIXME: ugly.
             let head = '^\s'
             let tail = '\s'
             for i in range(1, len(b:ywtxt_cus_headingslst) - 1)
-                execute 'syntax match ywtxt_heading' . i . ' /' . head . '\{' . (2 * (i - 1)) . '}' . substitute(escape(b:ywtxt_cus_headingslst[i-1], '\.'), '#', '\\(\\d\\+\\|#\\)', '') . tail . '.*/ contains=CONTAINED'
+                execute 'syntax match ywtxt_heading' . i . ' /' . head . '\{' . (2 * (i - 1)) . '}' . substitute(escape(b:ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . tail . '.*/ contains=CONTAINED'
             endfor
             for ei in range(len(b:ywtxt_cus_headingslst), 10)
                 execute 'syntax match ywtxt_heading'. ei .' /' . head . '\{' . (2 * (ei - 1)) . '}\%(\%(#\|\d\+\)\.\)\{'.(ei - b:ywtxt_cus_headingslst[-1] - 1).'}\%(#\|\d\+\)' . tail . '.*/ contains=CONTAINED'
