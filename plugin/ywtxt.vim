@@ -20,6 +20,12 @@ if exists("g:ywtxt_tocwidth")
     let s:ywtxt_tocwidth = g:ywtxt_tocwidth
     unlet g:ywtxt_tocwidth
 endif
+if exists("g:ywtxt_HeadingsPat")
+    let s:ywtxt_HeadingsPat = g:ywtxt_HeadingsPat
+    unlet g:ywtxt_HeadingsPat
+endif
+
+let s:ywtxt_toc_title_h = 2
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
 
@@ -47,18 +53,35 @@ function s:Ywtxt_ReturnPairRegion(t) "{{{ Return pair region line numbers.
 endfunction "}}}
 
 function Ywtxt_SearchHeadingPat() "{{{ search heading patten
-    let cus_headings = matchstr(getline(searchpos('^% HEADINGS ', 'cnw')[0]), '^\s*% HEADINGS\s\+\zs.*\ze\s*$')
-    if cus_headings == ''
+    if match(bufname(""), '_.*_TOC_') + 1 " Detect if toc(1) or mom(0) window
         return
     endif
-    let headingslst = split(cus_headings, '[''"]\zs\s\+\ze[''"]')
+    let cus_headings_disable = searchpos('^% HEADINGS NONE', 'cnw')[0]
+    if cus_headings_disable
+        return
+    endif
+    let cus_headings = matchstr(getline(searchpos('^% HEADINGS ', 'cnw')[0]), '^\s*% HEADINGS\s\+\zs.*\ze\s*$')
+    if cus_headings != ''
+        let headingslst = split(cus_headings, '[''"]\zs\s\+\ze[''"]')
+    elseif exists("s:ywtxt_HeadingsPat")
+        let headingslst = split(s:ywtxt_HeadingsPat, '[''"]\zs\s\+\ze[''"]')
+    else
+        return
+    endif
     if len(headingslst) == 0
         return
     endif
-    let b:ywtxt_cus_headingslst = map(headingslst[:-2], 'v:val[1:-2]')
-    call add(b:ywtxt_cus_headingslst, len(split(headingslst[-1], '\.')))
+    let last_headingpat = match(headingslst[-1][1:-2], '^\%(#\.\)*#$')
+    if last_headingpat == -1
+        let b:ywtxt_cus_headingslst = map(headingslst, 'v:val[1:-2]')
+        let start_autoheadinglevel = 2
+    else
+        let b:ywtxt_cus_headingslst = map(headingslst[:-2], 'v:val[1:-2]')
+        let start_autoheadinglevel = len(split(headingslst[-1], '\.'))
+    endif
+    call add(b:ywtxt_cus_headingslst, start_autoheadinglevel)
     " % HEADINGS "第#章" "第#节" "#." "#.#"
-    " b:ywtxt_cus_headingslst = ["第#章", "第#节", "#.", 2] 2 means symbol is the original 2nd section.
+    " b:ywtxt_cus_headingslst = ["第#章", "第#节", "#.", 2] 2 means ywtxt will auto generate the levels from '#.#'.
 endfunction "}}}
 
 function s:Ywtxt_ReturnHeadingName(l) "{{{ Get heading name.
@@ -100,18 +123,22 @@ endfunction "}}}
 
 function Ywtxt_FoldExpr(l) "{{{ Folding rule.
     let line=getline(a:l)
-    if match(line, '^\s*% BEGINSNIP ') == 0
+    if match(line, '^\s*% BEGINSNIP ywtxt') == 0
         if !exists("b:ywtxt_snip_in")
             let b:ywtxt_snip_in = 1
         else
             let b:ywtxt_snip_in += 1
         endif
         return 'a1'
+    elseif match(line, '^\s*% BEGINSNIP') == 0
+        return 'a1'
     elseif match(line, '^\s*% ENDSNIP') == 0
-        if b:ywtxt_snip_in == 1
-            unlet b:ywtxt_snip_in
-        else
-            let b:ywtxt_snip_in -= 1
+        if exists("b:ywtxt_snip_in")
+            if b:ywtxt_snip_in == 1
+                unlet b:ywtxt_snip_in
+            else
+                let b:ywtxt_snip_in -= 1
+            endif
         endif
         return 's1'
     endif
@@ -133,11 +160,17 @@ function Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
         let bufnr = bufnr(bufname(""))
         let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
         if bufwinnr
-            let l = toclst[0][line('.') - 2][2] " Why 2? toc window's first line is for displaying.
+            let ln = line('.')
+            if ln <= s:ywtxt_toc_title_h
+                return
+            endif
+            let l = toclst[0][line('.') - 1 - s:ywtxt_toc_title_h][2]
             execute bufwinnr . 'wincmd w'
             execute 'normal ' . l . 'Gzvzz'
         endif
-        if a:n == 2
+        if a:n == 0
+            wincmd p
+        elseif a:n == 2
             execute 'bwipeout ' . bufnr
         endif
     else
@@ -196,7 +229,11 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
                 let cus_headingslen = len(b:ywtxt_cus_headingslst) - 1
                 if hlevel > cus_headingslen
                     let startidx = cus_headingslen + 1
-                    execute 'let secnum = sec' . cus_headingslen
+                    if !exists("sec" . cus_headingslen)
+                        let secnum = 0
+                    else
+                        execute 'let secnum = sec' . cus_headingslen
+                    endif
                 else
                     let headingname = <SID>Ywtxt_ReturnHeadingName(hlevel)
                     let headingnamepre = matchstr(headingname, '.*\ze#')
@@ -238,7 +275,7 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
             let hlevel = 1
             let tail = matchstr(line, '^\(.\{-}\s\s\)\{1}\zs.*')
             let realsecnum = ''
-            let displaysecnum = '  '
+            let displaysecnum = heading . ' '
         endif
         if momlnum <= cur_cursor
             let n = len(toclst) + 1
@@ -251,14 +288,14 @@ endfunction "}}}
 
 function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
     let toclst = <SID>Ywtxt_GetHeadings(a:t)
-    if match(bufname(""), '_.*_TOC_') == 0
+    if match(bufname(""), '_.*_TOC_') == 0 " toc window
         let cur_cursor = line('.')
         let filelst = getbufline(b:ywtxt_toc_mom_bufnr, 1, '$')
     else " For mom window
         let filelst = getbufline("", 1, '$')
         let bufnr = bufnr("")
         let bufname = expand("%:t:r")
-        let cur_cursor = toclst[1] + 1
+        let cur_cursor = toclst[1] + s:ywtxt_toc_title_h
         let bufwnr = bufwinnr('_' . bufname . '_TOC_')
         if bufwnr == -1
             let tocwidth = (winwidth(bufwinnr(bufnr)) / 4)
@@ -284,7 +321,7 @@ function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
         endif
     endif
     let toc_len = len(toclst[0])
-    let toclns = ["§ " . a:t] " cur_cursor
+    let toclns = ["§ " . a:t, repeat("-", len(a:t) + 5)] " cur_cursor. let s:ywtxt_toc_title_h = 2
     syntax match ywtxt_toc_title /\%^\_.\{-}\zs§ .*$/
     highlight default link ywtxt_toc_title Title
     for l in range(toc_len)
@@ -292,7 +329,7 @@ function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
     endfor
     setlocal modifiable
     %d
-    call setline(1, toclns[0]) | center | call setline(2, toclns[1:])
+    call setline(1, toclns)
     let b:ywtxt_toc_type = a:t
     execute 'normal ' . cur_cursor . 'Gzv'
     setlocal nomodifiable
@@ -392,7 +429,7 @@ function Ywtxt_ReIndent(d) "{{{ Reindent
     call Ywtxt_WinJump(1)
     let save_cursor = getpos(".")
     let n = 1
-    for i in toclst[0][startline - 2 : curln - 2] " why 2? toc window's first line is for display only.
+    for i in toclst[0][startline - 1 - s:ywtxt_toc_title_h : curln - 1 - s:ywtxt_toc_title_h]
         if a:d == 'l' && level > 1
             call setline(i[2], <SID>Ywtxt_ReturnHeadingName(i[5] - 1) . '  ' . i[1])
         elseif a:d == 'r' && (level <= prevlevel)
@@ -596,9 +633,9 @@ function Ywtxt_keymaps() "{{{ key maps.
         nmap <silent> <buffer> K kzMzv:call Ywtxt_WinJump(1)<CR>zMzv:wincmd p<CR>
         nmap <silent> <buffer> q :bwipeout<CR>
         nmap <silent> <buffer> r :call Ywtxt_OpenTOC(b:ywtxt_toc_type)<CR>
-        nmap <silent> <buffer> <Space> :call Ywtxt_WinJump(1) <bar> wincmd p<CR>
+        nmap <silent> <buffer> <Space> :call Ywtxt_WinJump(0)<CR>
         nmap <silent> <buffer> <Enter> :call Ywtxt_WinJump(1)<CR>
-        nmap <silent> <buffer> X :call Ywtxt_toc_cmd('toggleFolding', 0)<CR>
+        nmap <silent> <buffer> X :call Ywtxt_toc_cmd('toggleFolding', 1)<CR>
         nmap <silent> <buffer> x :call Ywtxt_WinJump(2)<CR>
         nmap <silent> <buffer> <leader>< :call Ywtxt_ReIndent('l')<CR>
         nmap <silent> <buffer> <leader>> :call Ywtxt_ReIndent('r')<CR>

@@ -24,9 +24,14 @@ highlight default link ywtxt_ref Comment
 syntax match ywtxt_comment '^\s*%.*$' contains=ALL
 highlight default link ywtxt_comment Comment
 
-syntax match ywtxt_Fig '^\s*\cFig\(\.\|ure\)\s\(#\|\d\+\)\.\s\s'
+if match(bufname(""), '_.*_TOC_') == -1 " For mom window
+  syntax match ywtxt_Fig '^\s*\cFig\(\.\|ure\)\s\(#\|\d\+\)\.\s\s'
+  syntax match ywtxt_Tab '^\s*\cTable\s\(#\|\d\+\)\.\s\s'
+else " For mom window
+  syntax match ywtxt_Fig '^\s*\cFig\(\.\|ure\)\s\(#\|\d\+\)\.\s'
+  syntax match ywtxt_Tab '^\s*\cTable\s\(#\|\d\+\)\.\s'
+endif
 highlight default link ywtxt_Fig Comment
-syntax match ywtxt_Tab '^\s*\cTable\s\(#\|\d\+\)\.\s\s'
 highlight default link ywtxt_Tab Comment
 
 syntax match ywtxt_bold '\%([[:punct:]]\|\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\([[:punct:]]\|\s\|$\)'
