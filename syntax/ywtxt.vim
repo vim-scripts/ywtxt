@@ -25,25 +25,25 @@ syntax match ywtxt_comment '^\s*%.*$' contains=ALL
 highlight default link ywtxt_comment Comment
 
 if match(bufname(""), '_.*_TOC_') == -1 " For mom window
-  syntax match ywtxt_Fig '^\s*\cFig\(\.\|ure\)\s\(#\|\d\+\)\.\s\s'
-  syntax match ywtxt_Tab '^\s*\cTable\s\(#\|\d\+\)\.\s\s'
+  syntax match ywtxt_Fig '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\.\s\s'
+  syntax match ywtxt_Tab '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\.\s\s'
 else " For mom window
-  syntax match ywtxt_Fig '^\s*\cFig\(\.\|ure\)\s\(#\|\d\+\)\.\s'
-  syntax match ywtxt_Tab '^\s*\cTable\s\(#\|\d\+\)\.\s'
+  syntax match ywtxt_Fig '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\.\s'
+  syntax match ywtxt_Tab '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\.\s'
 endif
 highlight default link ywtxt_Fig Comment
 highlight default link ywtxt_Tab Comment
 
-syntax match ywtxt_bold '\%([[:punct:]]\|\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_bold '\%([[:punct:]]\|\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\%([[:punct:]]\|\s\|$\)'
 highlight ywtxt_bold term=bold cterm=bold gui=bold
 
-syntax match ywtxt_underline '\%([[:punct:]]\|\s\|^\)\zs_[^[:blank:]_]\+_\ze\([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_underline '\%([[:punct:]]\|\s\|^\)\zs_[^[:blank:]_]\+_\ze\%([[:punct:]]\|\s\|$\)'
 highlight ywtxt_underline term=underline cterm=underline gui=underline
 
-syntax match ywtxt_italic '\%([[:punct:]]\|\s\|^\)\zs/[^[:blank:]/]\+/\ze\([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_italic '\%([[:punct:]]\|\s\|^\)\zs/[^[:blank:]/]\+/\ze\%([[:punct:]]\|\s\|$\)'
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
-call Ywtxt_HeadingPat()
+call Ywtxt_GetHeadingsPat()
 
 if &background == "dark"
   highlight ywtxt_heading1 ctermfg=blue cterm=bold guifg=LightSkyBlue gui=bold

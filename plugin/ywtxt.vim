@@ -155,7 +155,7 @@ function Ywtxt_FoldExpr(l) "{{{ Folding rule.
     return '='
 endfunction "}}}
 
-function Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
+function s:Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
     " a:n: == 2: wipeout the toc window
     let tocwp = match(bufname(""), '_.*_TOC_') + 1 " Detect if toc(1) or mom(0) window
     if tocwp
@@ -163,10 +163,6 @@ function Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
         let bufnr = bufnr(bufname(""))
         let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
         if bufwinnr
-            let ln = line('.')
-            if ln <= s:ywtxt_toc_title_h
-                return
-            endif
             let l = toclst[0][line('.') - 1 - s:ywtxt_toc_title_h][2]
             execute bufwinnr . 'wincmd w'
             execute 'normal ' . l . 'Gzvzz'
@@ -266,10 +262,10 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
         else
             if a:t == 'Figure'
                 " Figure TOC gerneration
-                let pat = '^\s*\cFig\%(\.\|ure\)\s\%(#\|\d\+\)\.\ze\s\s'
+                let pat = '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\.\ze\s\s'
             elseif a:t == 'Table'
                 " Table TOC gerneration
-                let pat = '^\s*\cTable\s\%(#\|\d\+\)\.\ze\s\s'
+                let pat = '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\.\ze\s\s'
             endif
             let heading = matchstr(line, pat)
             if heading == ''
@@ -371,15 +367,49 @@ function Ywtxt_CreateHeading(l) "{{{ Create Heading.
     startinsert!
 endfunction "}}}
 
-function Ywtxt_toc_cmd(op,pos,...) "{{{ command on mom file in toc window.
-    " a:op: operation name. a:pos: operation is in Mom(1) or toc(0) window?
-    if match(bufname(""), '_.*_TOC_') == -1
+function Ywtxt_toc_cmd(op,pos,jumpp,...) "{{{ command on mom file in toc window.
+    " a:op: operation name. a:pos: operation can conduct on the title? a:jumpp: parameter passed to winjump()
+    if  (match(bufname(""), '_.*_TOC_') == -1) || ((a:pos == 0) && (line('.') <= s:ywtxt_toc_title_h)) || (line('$') == s:ywtxt_toc_title_h)
         return
     endif
     let toc_save_cursor = getpos(".")
-    call Ywtxt_WinJump(a:pos)
+    if a:op =~ '\%(syncheading\|reindent\)'
+        let toclst = <SID>Ywtxt_GetHeadings('Contents')
+    endif
+    if a:op == 'unfold' " jump
+        normal zR
+    elseif a:op == 'toggleFolding' " Folding toggle
+        if exists('b:ywtxt_foldingAll') && b:ywtxt_foldingAll == line('.')
+            unlet b:ywtxt_foldingAll
+            normal zR
+        else
+            let b:ywtxt_foldingAll = line('.')
+            normal zMzv
+        endif
+    elseif a:op == 'outlinemove' " move and outline
+        execute 'normal ' . a:1 . 'zMzv'
+    elseif a:op == 'reindent'
+        let startline=line(".")
+        let curln = startline + 1
+        let prevlevel = foldlevel(startline - 1)
+        let level = foldlevel('.')
+        let endline = line('$')
+        while (foldlevel(curln) > level) && (curln <= endline)
+            let curln += 1
+        endwhile
+        let curln -= 1
+    endif
+    call <SID>Ywtxt_WinJump(a:jumpp)
     let save_cursor = getpos(".")
-    if a:op == 'undo' " undo
+    if a:op == 'jump' " jump
+        if a:jumpp
+            return
+        endif
+    elseif a:op == 'unfold' " unfold
+        normal zR
+    elseif a:op == 'outlinemove' " move and outline
+        normal zMzv
+    elseif a:op == 'undo' " undo
         silent! undo
     elseif a:op == 'redo' " redo
         silent! redo
@@ -389,58 +419,37 @@ function Ywtxt_toc_cmd(op,pos,...) "{{{ command on mom file in toc window.
         silent call <SID>Ywtxt_ToHtml()
         return
     elseif a:op == 'syncheading' " Sync with the heading number.
-        let toclst = <SID>Ywtxt_GetHeadings('Contents')
         for l in toclst[0]
             call setline(l[2], l[3] . l[1])
         endfor
+    elseif a:op == 'reindent'
+        let n = 1
+        for i in toclst[0][startline - 1 - s:ywtxt_toc_title_h : curln - 1 - s:ywtxt_toc_title_h]
+            if a:1 == 'l' && level > 1
+                call setline(i[2], <SID>Ywtxt_ReturnHeadingName(i[5] - 1) . '  ' . i[1])
+            elseif a:1 == 'r' && (level <= prevlevel)
+                call setline(i[2], <SID>Ywtxt_ReturnHeadingName(i[5] + 1) . '  ' . i[1])
+            endif
+        endfor
     elseif a:op == 'genrefs' " Generate Bibliography.
-        echohl ErrorMsg
-        echo "This operation will generate the References section, all lines in the references setion will be deleted, you've been warned!"
-        echohl MoreMsg
-        echo "Are you sure? (Y)es/(N)o"
-        echohl None
+        echohl ErrorMsg | echo "This operation will generate the References section, all lines in the references setion will be deleted, you've been warned!"
+        echohl MoreMsg | echo "Are you sure? (Y)es/(N)o" | echohl None
         if getchar() =~ '\%(121\|89\)'
             call <SID>Ywtxt_GenBibliography()
         endif
     elseif a:op == 'toggleFolding' " Folding toggle
-        if exists('s:ywtxt_foldingAll') && s:ywtxt_foldingAll == line('.')
-            unlet s:ywtxt_foldingAll
-            normal zR
-        else
-            let s:ywtxt_foldingAll = line('.')
+        if exists('b:ywtxt_foldingAll')
             normal zMzv
+        else
+            normal zR
         endif
     endif
     call setpos('.', save_cursor)
     wincmd p
-    silent call Ywtxt_OpenTOC('Contents')
+    if a:op =~ '\%(genrefs\|reindent\)'
+        silent call Ywtxt_OpenTOC('Contents')
+    endif
     call setpos('.', toc_save_cursor)
-endfunction "}}}
-
-function Ywtxt_ReIndent(d) "{{{ Reindent
-    " a:d: direction
-    let toclst = <SID>Ywtxt_GetHeadings('Contents')
-    let startline=line(".")
-    let curln = startline + 1
-    let prevlevel = foldlevel(startline - 1)
-    let level = foldlevel('.')
-    let endline = line('$')
-    while (foldlevel(curln) > level) && (curln <= endline)
-        let curln += 1
-    endwhile
-    let curln -= 1
-    call Ywtxt_WinJump(1)
-    let save_cursor = getpos(".")
-    let n = 1
-    for i in toclst[0][startline - 1 - s:ywtxt_toc_title_h : curln - 1 - s:ywtxt_toc_title_h]
-        if a:d == 'l' && level > 1
-            call setline(i[2], <SID>Ywtxt_ReturnHeadingName(i[5] - 1) . '  ' . i[1])
-        elseif a:d == 'r' && (level <= prevlevel)
-            call setline(i[2], <SID>Ywtxt_ReturnHeadingName(i[5] + 1) . '  ' . i[1])
-        endif
-    endfor
-    call setpos('.', save_cursor)
-    call Ywtxt_OpenTOC('Contents')
 endfunction "}}}
 
 function s:Ywtxt_OpenBibFile(w) " {{{ Open bib file.
@@ -450,7 +459,7 @@ function s:Ywtxt_OpenBibFile(w) " {{{ Open bib file.
         return
     endif
     if bufwnr == -1
-        execute 'split ' . bibfile
+        execute 'keepalt split ' . bibfile
     else
         execute bufwnr . 'wincmd w'
     endif
@@ -632,24 +641,24 @@ function Ywtxt_keymaps() "{{{ key maps.
         nmap <silent> <buffer> <Leader>I :call Ywtxt_InsertSnip()<CR>
     else " For toc window
         nmap <silent> <buffer> t :call Ywtxt_ToggleToc()<CR>
-        nmap <silent> <buffer> J jzMzv:call Ywtxt_WinJump(1)<CR>zMzv:wincmd p<CR>
-        nmap <silent> <buffer> K kzMzv:call Ywtxt_WinJump(1)<CR>zMzv:wincmd p<CR>
+        nmap <silent> <buffer> J :call Ywtxt_toc_cmd('outlinemove', 0, 1, 'j')<CR>
+        nmap <silent> <buffer> K :call Ywtxt_toc_cmd('outlinemove', 0, 1, 'k')<CR>
         nmap <silent> <buffer> q :bwipeout<CR>
         nmap <silent> <buffer> r :call Ywtxt_OpenTOC(b:ywtxt_toc_type)<CR>
-        nmap <silent> <buffer> <Space> :call Ywtxt_WinJump(0)<CR>
-        nmap <silent> <buffer> <Enter> :call Ywtxt_WinJump(1)<CR>
-        nmap <silent> <buffer> X :call Ywtxt_toc_cmd('toggleFolding', 1)<CR>
-        nmap <silent> <buffer> x :call Ywtxt_WinJump(2)<CR>
-        nmap <silent> <buffer> <leader>< :call Ywtxt_ReIndent('l')<CR>
-        nmap <silent> <buffer> <leader>> :call Ywtxt_ReIndent('r')<CR>
-        nmap <silent> <buffer> u :call Ywtxt_toc_cmd('undo', 1)<CR>
-        nmap <silent> <buffer> <c-r> :call Ywtxt_toc_cmd('redo', 1)<CR>
-        nmap <silent> <buffer> w :call Ywtxt_toc_cmd('save', 1)<CR>
+        nmap <silent> <buffer> <Space> :call Ywtxt_toc_cmd('jump', 0, 0)<CR>
+        nmap <silent> <buffer> <Enter> :call Ywtxt_toc_cmd('jump', 0, 1)<CR>
+        nmap <silent> <buffer> X :call Ywtxt_toc_cmd('toggleFolding', 0, 1)<CR>
+        nmap <silent> <buffer> x :call Ywtxt_toc_cmd('jump', 0, 2)<CR>
+        nmap <silent> <buffer> <leader>< :call Ywtxt_toc_cmd('reindent', 1, 1, 'l')<CR>
+        nmap <silent> <buffer> <leader>> :call Ywtxt_toc_cmd('reindent', 1, 1, 'r')<CR>
+        nmap <silent> <buffer> u :call Ywtxt_toc_cmd('undo', 1, 1)<CR>
+        nmap <silent> <buffer> <c-r> :call Ywtxt_toc_cmd('redo', 1, 1)<CR>
+        nmap <silent> <buffer> w :call Ywtxt_toc_cmd('save', 1, 1)<CR>
         nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr(b:ywtxt_toc_mom_bufnr) . 'wincmd w'<CR>
-        nmap <silent> <buffer> S :call Ywtxt_toc_cmd('syncheading', 1)<CR>
-        nmap <silent> <buffer> B :call Ywtxt_toc_cmd('genrefs', 1)<CR>
-        nmap <silent> <buffer> E :call Ywtxt_toc_cmd('2html', 2)<CR>
-        nmap <silent> <buffer> A zR:call Ywtxt_WinJump(1)<CR>zR:wincmd p<CR>
+        nmap <silent> <buffer> S :call Ywtxt_toc_cmd('syncheading', 1, 1)<CR>
+        nmap <silent> <buffer> B :call Ywtxt_toc_cmd('genrefs', 1, 1)<CR>
+        nmap <silent> <buffer> E :call Ywtxt_toc_cmd('2html', 1, 2)<CR>
+        nmap <silent> <buffer> A :call Ywtxt_toc_cmd('unfold', 0, 1)<CR>
     endif
 endfunction "}}}
 
@@ -842,7 +851,7 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
 endfunction "}}}
 " command -bar -range=% YwtxtTOhtml call Ywtxt_ToHtml(<line1>,<line2>)
 
-function Ywtxt_HeadingPat() "{{{ Get patten of headings for syntax. FIXME: ugly.
+function Ywtxt_GetHeadingsPat() "{{{ Get patten of headings for syntax. FIXME: ugly.
     if exists("b:ywtxt_cus_headingslst")
         if match(bufname(""), '_.*_TOC_') == -1 " mom window
             let head = '^'
