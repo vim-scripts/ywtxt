@@ -465,7 +465,7 @@ function Ywtxt_toc_cmd(op,pos,jumpp,...) "{{{ command on mom file in toc window.
     endif
     call setpos('.', save_cursor)
     wincmd p
-    if a:op =~ '\%(genrefs\|reindent\)'
+    if a:op =~ '\%(genrefs\|reindent\|undo\|redo\)'
         silent call Ywtxt_OpenTOC('Contents')
     endif
     call setpos('.', toc_save_cursor)
