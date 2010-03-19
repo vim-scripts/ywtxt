@@ -2,6 +2,8 @@
 " Author: Yue Wu <ywupub@gmail.com>
 " License: BSD
 
+scriptencoding utf-8
+
 setlocal fdm=expr
 setlocal foldexpr=Ywtxt_FoldExpr(v:lnum)
 setlocal foldtext=getline(v:foldstart)

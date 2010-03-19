@@ -5,6 +5,7 @@
 if exists("b:current_syntax")
   finish
 endif
+scriptencoding utf-8
 
 call Ywtxt_SearchHeadingPat()
 
@@ -34,40 +35,17 @@ endif
 highlight default link ywtxt_Fig Comment
 highlight default link ywtxt_Tab Comment
 
-syntax match ywtxt_bold '\%([[:punct:]]\|\s\|^\)\zs\*[^[:blank:]*]\+\*\ze\%([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_bold '\%(\s\|^\)\zs\*\S[^*]*\S\*\ze\%(\s\|$\)'
 highlight ywtxt_bold term=bold cterm=bold gui=bold
 
-syntax match ywtxt_underline '\%([[:punct:]]\|\s\|^\)\zs_[^[:blank:]_]\+_\ze\%([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_underline '\%(\s\|^\)\zs_\S[^_]*\S_\ze\%(\s\|$\)'
 highlight ywtxt_underline term=underline cterm=underline gui=underline
 
-syntax match ywtxt_italic '\%([[:punct:]]\|\s\|^\)\zs/[^[:blank:]/]\+/\ze\%([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_italic '\%(\s\|^\)\zs/\S[^/]*\S/\ze\%(\s\|$\)'
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
 call Ywtxt_GetHeadingsPat()
-
-if &background == "dark"
-  highlight ywtxt_heading1 ctermfg=blue cterm=bold guifg=LightSkyBlue gui=bold
-  highlight ywtxt_heading2 ctermfg=yellow cterm=bold guifg=LightGoldenrod gui=bold
-  highlight ywtxt_heading3 ctermfg=cyan cterm=bold guifg=Cyan1 gui=bold
-  highlight ywtxt_heading4 ctermfg=red cterm=bold guifg=red1 gui=bold
-  highlight ywtxt_heading5 ctermfg=green cterm=bold guifg=PaleGreen gui=bold
-  highlight ywtxt_heading6 ctermfg=magenta cterm=bold guifg=Aquamarine gui=bold
-  highlight ywtxt_heading7 ctermfg=blue cterm=bold guifg=LightSteelBlue gui=bold
-  highlight ywtxt_heading8 ctermfg=green cterm=bold guifg=LightSalmon gui=bold
-  highlight ywtxt_heading9 ctermfg=blue cterm=bold guifg=LightSkyBlue gui=bold
-  highlight ywtxt_heading10 ctermfg=yellow cterm=bold guifg=LightGoldenrod gui=bold
-else
-  highlight ywtxt_heading1 ctermfg=blue cterm=bold guifg=Blue1 gui=bold
-  highlight ywtxt_heading2 ctermfg=yellow cterm=bold guifg=DarkGoldenrod gui=bold
-  highlight ywtxt_heading3 ctermfg=cyan cterm=bold guifg=Purple gui=bold
-  highlight ywtxt_heading4 ctermfg=red cterm=bold guifg=red gui=bold
-  highlight ywtxt_heading5 ctermfg=green cterm=bold guifg=ForestGreen gui=bold
-  highlight ywtxt_heading6 ctermfg=magenta cterm=bold guifg=CadetBlue gui=bold
-  highlight ywtxt_heading7 ctermfg=blue cterm=bold guifg=Orchid gui=bold
-  highlight ywtxt_heading8 ctermfg=green cterm=bold guifg=RosyBrown gui=bold
-  highlight ywtxt_heading9 ctermfg=blue cterm=bold guifg=Blue1 gui=bold
-  highlight ywtxt_heading10 ctermfg=yellow cterm=bold guifg=DarkGoldenrod gui=bold
-endif
+call Ywtxt_highlightheadings()
 
 let b:current_syntax = "ywtxt"
 

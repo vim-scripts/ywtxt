@@ -25,6 +25,25 @@ if exists("g:ywtxt_HeadingsPat")
     unlet g:ywtxt_HeadingsPat
 endif
 
+if exists("g:ywtxt_headings_hl")
+    let s:ywtxt_headings_hl = g:ywtxt_headings_hl
+    unlet g:ywtxt_headings_hl
+else
+    " s:ywtxt_headings_hl = {'level':[[fg_on_dark_term, fg_on_light_term], [fg_on_dark_gui, fg_on_light_gui]]}
+    let s:ywtxt_headings_hl = {
+                \'1':[['blue', 'blue'],['LightSkyBlue', 'Blue1']],
+                \'2':[['yellow', 'yellow'],['LightGoldenrod', 'DarkGoldenrod']],
+                \'3':[['cyan', 'cyan'],['Cyan1', 'Purple']],
+                \'4':[['red', 'red'],['red1', 'red']],
+                \'5':[['green', 'green'],['PaleGreen', 'ForestGreen']],
+                \'6':[['magenta', 'magenta'],['Aquamarine', 'CadetBlue']],
+                \'7':[['blue', 'blue'],['LightSteelBlue', 'Orchid']],
+                \'8':[['green', 'green'],['LightSalmon', 'RosyBrown']],
+                \'9':[['blue', 'blue'],['LightSkyBlue', 'Blue1']],
+                \'10':[['yellow', 'yellow'],['LightGoldenrod', 'DarkGoldenrod']],
+                \}
+endif
+
 let s:ywtxt_toc_title_h = 2
 let s:ywtxt_def_headingpat = '\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)'
 
@@ -883,6 +902,18 @@ function Ywtxt_GetHeadingsPat() "{{{ Get patten of headings for syntax. FIXME: u
             endfor
         endif
     endif
+endfunction "}}}
+
+function Ywtxt_highlightheadings() "{{{ Highlight headings
+if &background == "dark"
+    for i in range(1, len(s:ywtxt_headings_hl))
+        execute 'highlight ywtxt_heading' . i . ' ctermfg=' . s:ywtxt_headings_hl[i][0][0] . ' cterm=bold guifg=' . s:ywtxt_headings_hl[i][1][0] . ' gui=bold'
+    endfor
+else
+    for i in range(1, len(s:ywtxt_headings_hl))
+        execute 'highlight ywtxt_heading' . i . ' ctermfg=' . s:ywtxt_headings_hl[i][0][1] . ' cterm=bold guifg=' . s:ywtxt_headings_hl[i][1][1] . ' gui=bold'
+    endfor
+endif
 endfunction "}}}
 
 " vim: foldmethod=marker:
