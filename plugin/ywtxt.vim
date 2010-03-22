@@ -403,6 +403,7 @@ function Ywtxt_toc_cmd(op,pos,jumpp,...) "{{{ command on mom file in toc window.
             normal zR
         else
             let b:ywtxt_foldingAll = line('.')
+            let ywtxt_foldingAll = b:ywtxt_foldingAll
             normal zMzv
         endif
     elseif a:op == 'outlinemove' " move and outline
@@ -457,7 +458,7 @@ function Ywtxt_toc_cmd(op,pos,jumpp,...) "{{{ command on mom file in toc window.
             call <SID>Ywtxt_GenBibliography()
         endif
     elseif a:op == 'toggleFolding' " Folding toggle
-        if exists('b:ywtxt_foldingAll')
+        if exists('ywtxt_foldingAll')
             normal zMzv
         else
             normal zR
@@ -860,7 +861,7 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
     %s/<u>\zs_\([^<]*\)_\ze</\1/ge " underlined
     if len(refsdic) != 0 "  replace the ref keyword with the citing number.
         for i in range(1, len(refsdic))
-            execute '%s/\^\[[^]]*\zs' . refsdic[i][0] . '\ze[^]]*]/' . i . '/g'
+            execute '%s/\^\[[^]]*\zs' . refsdic[i][0] . '\ze[^]]*]/' . i . '/ge'
         endfor
     endif
     %s/\^{\([^}]\+\)}/<sup>\1<\/sup>/ge " superscript html
