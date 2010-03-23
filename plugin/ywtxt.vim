@@ -25,6 +25,11 @@ if exists("g:ywtxt_HeadingsPat")
     unlet g:ywtxt_HeadingsPat
 endif
 
+if exists("g:ywtxt_browserapp")
+    let s:ywtxt_browserapp = g:ywtxt_browserapp
+    unlet g:ywtxt_browserapp
+endif
+
 if exists("g:ywtxt_headings_hl")
     let s:ywtxt_headings_hl = g:ywtxt_headings_hl
     unlet g:ywtxt_headings_hl
@@ -193,6 +198,22 @@ function s:Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
         endif
     else
         call <SID>Ywtxt_OpenTOC(b:toc_type)
+    endif
+endfunction "}}}
+
+function s:Ywtxt_Jump2File(f,a) "{{{ Jump to file
+    let bufwnr = bufwinnr(a:f)
+    if !filereadable(a:f)
+        return
+    endif
+    if bufwnr == -1
+        execute 'keepalt split ' . a:f
+    else
+        execute bufwnr . 'wincmd w'
+    endif
+    if a:a != ''
+        call search(a:a, 'w')
+        normal zvzz
     endif
 endfunction "}}}
 
@@ -474,17 +495,7 @@ endfunction "}}}
 
 function s:Ywtxt_OpenBibFile(w) " {{{ Open bib file.
     let bibfile = expand(matchstr(getline(searchpos('^% bibfile = ', 'nw')[0]), '^% bibfile = ''\zs[^'']*'))
-    let bufwnr = bufwinnr(bibfile)
-    if !filereadable(bibfile)
-        return
-    endif
-    if bufwnr == -1
-        execute 'keepalt split ' . bibfile
-    else
-        execute bufwnr . 'wincmd w'
-    endif
-    call search('{' . a:w . '\>', 'w')
-    normal zv
+    call <SID>Ywtxt_Jump2File(bibfile,'{' . a:w . '\>')
 endfunction "}}}
 
 function s:Ywtxt_GetBibEntry(...) " {{{ Show bib entry
@@ -728,13 +739,36 @@ function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
     let kwd = expand('<cword>')
     if match(line, '\^\[[^]]*' . kwd . '[^]]*\]') != -1
         if a:k == 't'
-            echohl MoreMsg
-            echo <SID>Ywtxt_GetBibEntry(kwd)
-            echohl None
+            echohl MoreMsg | echo <SID>Ywtxt_GetBibEntry(kwd) | echohl None
         elseif a:k == 'e'
             call <SID>Ywtxt_OpenBibFile(kwd)
         endif
         return
+    elseif match(line, '\*\[[^]]*\]') != -1
+        let endidx = len(line) - 1
+        let cur = col('.')
+        let start = cur - 1
+        let end = cur + 1
+        while (start > 0) && (line[start - 1] != '[')
+            let start -= 1
+        endwhile
+        while (end < endidx) && (line[end + 1] != ']')
+            let end += 1
+        endwhile
+        if (cur >= start) && (cur < end)
+            let hyper = line[start : end]
+            if a:k == 'e' && (hyper != '')
+                let hyperfile = expand(matchstr(hyper, '^[^#]*'))
+                let hyperanchor = matchstr(hyper, '#\zs.*$')
+                if (hyperfile == '') && (hyperanchor != '')
+                    let hyperfile = expand('%')
+                endif
+                if filereadable(hyperfile)
+                    call <SID>Ywtxt_Jump2File(hyperfile, '\V' . escape(hyperanchor, '\'))
+                    return
+                endif
+            endif
+        endif
     endif
     if a:k == 't'
         silent! normal za
@@ -868,6 +902,14 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
     %s/_{\([^}]\+\)}/<sub>\1<\/sub>/ge " subscript html
     %s/\^\(\[[^]]\+\]\|{[^}]\+}\)/<sup>\1<\/sup>/ge " superscript citing number html
     %s/\[\s*\f*\.\%(jpg\|png\|bmp\|gif\)\s*\]/\='<img src=' . substitute(submatch(0)[1 : -2], '\s', '%20', 'g') . '>'/gei " pictures
+    if exists("s:ywtxt_browserapp") && executable(s:ywtxt_browserapp)
+        if has("unix")
+            execute 'write | !' . s:ywtxt_browserapp . ' % &'
+        elseif has("win32")
+            execute 'write | !START ' . s:ywtxt_browserapp . ' %'
+        endif
+        bwipeout | redraw!
+    endif
 endfunction "}}}
 " command -bar -range=% YwtxtTOhtml call Ywtxt_ToHtml(<line1>,<line2>)
 
