@@ -21,6 +21,10 @@ highlight default link ywtxt_note Todo
 
 syntax match ywtxt_ref '\^\[[^]]*\]'
 highlight default link ywtxt_ref Comment
+syntax match ywtxt_url '\*\[#[^]]*\]'
+highlight default link ywtxt_url String
+syntax match ywtxt_anchor '\*\@<!\[#[^]]*\]'
+highlight default link ywtxt_anchor Identifier
 
 syntax match ywtxt_comment '^\s*%.*$' contains=ALL
 highlight default link ywtxt_comment Comment
@@ -44,7 +48,7 @@ highlight ywtxt_underline term=underline cterm=underline gui=underline
 syntax match ywtxt_italic '\%(\s\|^\)\zs/\S[^/]*\S/\ze\%(\s\|$\)'
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
-call Ywtxt_GetHeadingsPat()
+call Ywtxt_Syntax_HeadingsPat()
 call Ywtxt_highlightheadings()
 
 let b:current_syntax = "ywtxt"

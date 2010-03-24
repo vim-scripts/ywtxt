@@ -11,7 +11,6 @@ setlocal foldtext=getline(v:foldstart)
 if match(bufname(""), '_.*_TOC_') == 0 " For toc window
     setlocal cursorline
 else " For mom window
-    setlocal textwidth=72
 endif
 
 setlocal comments=":%"

@@ -54,6 +54,138 @@ let s:ywtxt_def_headingpat = '\%(\%(#\|\d\+\)\.\)*\%(#\|\d\+\)'
 
 let s:ywtxt_htmlpretagsl = ['<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>', '<pre style="word-wrap: break-word; white-space: pre-wrap; white-space: -moz-pre-wrap" >']
 
+function Ywtxt_FoldExpr(l) "{{{ Folding rule.
+    let line=getline(a:l)
+    if match(line, '^\s*% BEGINSNIP ywtxt') == 0
+        if !exists("b:ywtxt_snip_in")
+            let b:ywtxt_snip_in = 1
+        else
+            let b:ywtxt_snip_in += 1
+        endif
+        return 'a1'
+    elseif match(line, '^\s*% BEGINSNIP') == 0
+        return 'a1'
+    elseif match(line, '^\s*% ENDSNIP') == 0
+        if exists("b:ywtxt_snip_in")
+            if b:ywtxt_snip_in == 1
+                unlet b:ywtxt_snip_in
+            else
+                let b:ywtxt_snip_in -= 1
+            endif
+        endif
+        return 's1'
+    endif
+    if exists("b:ywtxt_snip_in")
+        return '='
+    endif
+    let headingp = <SID>Ywtxt_HeadingP(line)
+    if headingp
+        return '>' . headingp
+    endif
+    return '='
+endfunction "}}}
+
+function s:Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
+    " a:n: == 2: wipeout the toc window
+    let tocwp = match(bufname(""), '_.*_TOC_') + 1 " Detect if toc(1) or mom(0) window
+    if tocwp
+        let toclst = <SID>Ywtxt_GetHeadings(b:ywtxt_toc_type)
+        let bufnr = bufnr(bufname(""))
+        let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
+        if bufwinnr
+            let l = toclst[0][line('.') - 1 - s:ywtxt_toc_title_h][2]
+            execute bufwinnr . 'wincmd w'
+            execute 'normal ' . l . 'Gzvzz'
+        endif
+        if a:n == 0
+            wincmd p
+        elseif a:n == 2
+            execute 'bwipeout ' . bufnr
+        endif
+    else
+        call <SID>Ywtxt_OpenTOC(b:toc_type)
+    endif
+endfunction "}}}
+
+function s:Ywtxt_Jump2File(f,a,b) "{{{ Jump to file
+    let bufwnr = bufwinnr(a:f)
+    if !filereadable(a:f)
+        return
+    endif
+    if bufwnr == -1
+        execute 'keepalt split ' . a:f
+    else
+        execute bufwnr . 'wincmd w'
+    endif
+    if a:a != ''
+        if search(a:a, 'w') == 0
+            echohl ErrorMsg | echo "Unknown location! Try to find normal string." | echohl NONE
+            call search(a:b, 'w')
+        endif
+        normal zvzz
+    endif
+endfunction "}}}
+
+function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
+    let toclst = <SID>Ywtxt_GetHeadings(a:t)
+    if match(bufname(""), '_.*_TOC_') == 0 " toc window
+        let cur_cursor = line('.')
+        let filelst = getbufline(b:ywtxt_toc_mom_bufnr, 1, '$')
+    else " For mom window
+        let filelst = getbufline("", 1, '$')
+        let bufnr = bufnr("")
+        let bufname = expand("%:t:r")
+        let cur_cursor = toclst[1] + s:ywtxt_toc_title_h
+        let bufwnr = bufwinnr('_' . bufname . '_TOC_')
+        if bufwnr == -1
+            let tocwidth = (winwidth(bufwinnr(bufnr)) / 4)
+            if exists("s:ywtxt_tocwidth")
+                let tocwidth = s:ywtxt_tocwidth
+            endif
+            if exists("b:ywtxt_cus_headingslst")
+                let ywtxt_cus_headingslst = b:ywtxt_cus_headingslst
+            endif
+            execute 'silent keepalt ' . tocwidth . 'vsplit _' .  bufname . '_TOC_'
+            if exists("ywtxt_cus_headingslst")
+                let b:ywtxt_cus_headingslst = ywtxt_cus_headingslst
+            endif
+            setlocal buftype=nofile
+            setlocal bufhidden=hide
+            setlocal noswapfile
+            setlocal filetype=ywtxt
+            setlocal nowrap
+            execute 'setlocal textwidth=' . tocwidth
+            let b:ywtxt_toc_mom_bufnr = bufnr
+        elseif bufwnr != -1
+            execute bufwnr . 'wincmd w'
+        endif
+    endif
+    let toc_len = len(toclst[0])
+    let toclns = ["§ " . a:t, repeat("-", len(a:t) + 5)] " cur_cursor. let s:ywtxt_toc_title_h = 2
+    syntax match ywtxt_toc_title /\%^\_.\{-}\zs§ .*$/
+    highlight default link ywtxt_toc_title Title
+    for l in range(toc_len)
+        call add(toclns, toclst[0][l][4] . toclst[0][l][1])
+    endfor
+    setlocal modifiable
+    %d
+    call setline(1, toclns)
+    let b:ywtxt_toc_type = a:t
+    execute 'normal ' . cur_cursor . 'Gzv'
+    setlocal nomodifiable
+endfunction "}}}
+
+function Ywtxt_ToggleToc() "{{{ Toggle toc type
+    let toctypelst = ['Contents', 'Figure', 'Table']
+    let typeidx = index(toctypelst, b:ywtxt_toc_type)
+    if typeidx != (len(toctypelst) - 1)
+        let typeidx += 1
+    else
+        let typeidx = 0
+    endif
+    call Ywtxt_OpenTOC(toctypelst[typeidx])
+endfunction "}}}
+
 function s:Ywtxt_ReturnPairRegion(t) "{{{ Return pair region line numbers.
     let save_cursor = getpos(".")
     let leftlist = []
@@ -146,75 +278,6 @@ function s:Ywtxt_HeadingP(l,...) "{{{ Return the heading level, 0 if not.
         endif
     endif
     return headinglen
-endfunction "}}}
-
-function Ywtxt_FoldExpr(l) "{{{ Folding rule.
-    let line=getline(a:l)
-    if match(line, '^\s*% BEGINSNIP ywtxt') == 0
-        if !exists("b:ywtxt_snip_in")
-            let b:ywtxt_snip_in = 1
-        else
-            let b:ywtxt_snip_in += 1
-        endif
-        return 'a1'
-    elseif match(line, '^\s*% BEGINSNIP') == 0
-        return 'a1'
-    elseif match(line, '^\s*% ENDSNIP') == 0
-        if exists("b:ywtxt_snip_in")
-            if b:ywtxt_snip_in == 1
-                unlet b:ywtxt_snip_in
-            else
-                let b:ywtxt_snip_in -= 1
-            endif
-        endif
-        return 's1'
-    endif
-    if exists("b:ywtxt_snip_in")
-        return '='
-    endif
-    let headingp = <SID>Ywtxt_HeadingP(line)
-    if headingp
-        return '>' . headingp
-    endif
-    return '='
-endfunction "}}}
-
-function s:Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
-    " a:n: == 2: wipeout the toc window
-    let tocwp = match(bufname(""), '_.*_TOC_') + 1 " Detect if toc(1) or mom(0) window
-    if tocwp
-        let toclst = <SID>Ywtxt_GetHeadings(b:ywtxt_toc_type)
-        let bufnr = bufnr(bufname(""))
-        let bufwinnr = bufwinnr(b:ywtxt_toc_mom_bufnr)
-        if bufwinnr
-            let l = toclst[0][line('.') - 1 - s:ywtxt_toc_title_h][2]
-            execute bufwinnr . 'wincmd w'
-            execute 'normal ' . l . 'Gzvzz'
-        endif
-        if a:n == 0
-            wincmd p
-        elseif a:n == 2
-            execute 'bwipeout ' . bufnr
-        endif
-    else
-        call <SID>Ywtxt_OpenTOC(b:toc_type)
-    endif
-endfunction "}}}
-
-function s:Ywtxt_Jump2File(f,a) "{{{ Jump to file
-    let bufwnr = bufwinnr(a:f)
-    if !filereadable(a:f)
-        return
-    endif
-    if bufwnr == -1
-        execute 'keepalt split ' . a:f
-    else
-        execute bufwnr . 'wincmd w'
-    endif
-    if a:a != ''
-        call search(a:a, 'w')
-        normal zvzz
-    endif
 endfunction "}}}
 
 function s:Ywtxt_GetHeadings(t) "{{{ Get headings
@@ -323,55 +386,6 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
         " real line: heading(0) + tail(1). momlnum(2): file_mom current line number in Mom window. secnum(3): section number, display secnum(4): use in toc win to display; hlevel(5): level of section.
     endfor
     return [toclst, n] " n: curren section
-endfunction "}}}
-
-function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
-    let toclst = <SID>Ywtxt_GetHeadings(a:t)
-    if match(bufname(""), '_.*_TOC_') == 0 " toc window
-        let cur_cursor = line('.')
-        let filelst = getbufline(b:ywtxt_toc_mom_bufnr, 1, '$')
-    else " For mom window
-        let filelst = getbufline("", 1, '$')
-        let bufnr = bufnr("")
-        let bufname = expand("%:t:r")
-        let cur_cursor = toclst[1] + s:ywtxt_toc_title_h
-        let bufwnr = bufwinnr('_' . bufname . '_TOC_')
-        if bufwnr == -1
-            let tocwidth = (winwidth(bufwinnr(bufnr)) / 4)
-            if exists("s:ywtxt_tocwidth")
-                let tocwidth = s:ywtxt_tocwidth
-            endif
-            if exists("b:ywtxt_cus_headingslst")
-                let ywtxt_cus_headingslst = b:ywtxt_cus_headingslst
-            endif
-            execute 'keepalt ' . tocwidth . 'vsplit _' .  bufname . '_TOC_'
-            if exists("ywtxt_cus_headingslst")
-                let b:ywtxt_cus_headingslst = ywtxt_cus_headingslst
-            endif
-            setlocal buftype=nofile
-            setlocal bufhidden=hide
-            setlocal noswapfile
-            setlocal filetype=ywtxt
-            setlocal nowrap
-            execute 'setlocal textwidth=' . tocwidth
-            let b:ywtxt_toc_mom_bufnr = bufnr
-        elseif bufwnr != -1
-            execute bufwnr . 'wincmd w'
-        endif
-    endif
-    let toc_len = len(toclst[0])
-    let toclns = ["§ " . a:t, repeat("-", len(a:t) + 5)] " cur_cursor. let s:ywtxt_toc_title_h = 2
-    syntax match ywtxt_toc_title /\%^\_.\{-}\zs§ .*$/
-    highlight default link ywtxt_toc_title Title
-    for l in range(toc_len)
-        call add(toclns, toclst[0][l][4] . toclst[0][l][1])
-    endfor
-    setlocal modifiable
-    %d
-    call setline(1, toclns)
-    let b:ywtxt_toc_type = a:t
-    execute 'normal ' . cur_cursor . 'Gzv'
-    setlocal nomodifiable
 endfunction "}}}
 
 function Ywtxt_CreateHeading(l) "{{{ Create Heading.
@@ -493,9 +507,202 @@ function Ywtxt_toc_cmd(op,pos,jumpp,...) "{{{ command on mom file in toc window.
     call setpos('.', toc_save_cursor)
 endfunction "}}}
 
+function Ywtxt_keymaps() "{{{ key maps.
+    nmap <silent> <buffer> <Tab> :call Ywtxt_Tab('t')<CR>
+    nmap <silent> <buffer> <Leader>t :call Ywtxt_OpenTOC('Contents')<CR>
+    if match(bufname(""), '_.*_TOC_') == -1 " For mom window
+        nmap <silent> <buffer> <Leader>i :call Ywtxt_CreateHeading(1)<CR>
+        nmap <silent> <buffer> <Leader>o :call Ywtxt_CreateHeading(0)<CR>
+        nmap <silent> <buffer> <Leader><s-o> :call Ywtxt_CreateHeading(-1)<CR>
+        nmap <silent> <buffer> <Leader>q :execute 'silent! bwipeout ' . bufnr('_' . expand("%:t:r") . '_TOC_')<CR>
+        nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr('_' . expand("%:t:r") . '_TOC_') . 'wincmd w'<CR>
+        nmap <silent> <buffer> <CR> :call Ywtxt_Tab('e')<CR>
+        imap <buffer> ^{ ^{}<Left>
+        imap <buffer> ^[ ^[]<Left>
+        nmap <silent> <buffer> <Leader>I :call Ywtxt_InsertSnip()<CR>
+    else " For toc window
+        nmap <silent> <buffer> t :call Ywtxt_ToggleToc()<CR>
+        nmap <silent> <buffer> J :call Ywtxt_toc_cmd('outlinemove', 0, 1, 'j')<CR>
+        nmap <silent> <buffer> K :call Ywtxt_toc_cmd('outlinemove', 0, 1, 'k')<CR>
+        nmap <silent> <buffer> q :bwipeout<CR>
+        nmap <silent> <buffer> r :call Ywtxt_OpenTOC(b:ywtxt_toc_type)<CR>
+        nmap <silent> <buffer> <Space> :call Ywtxt_toc_cmd('jump', 0, 0)<CR>
+        nmap <silent> <buffer> <Enter> :call Ywtxt_toc_cmd('jump', 0, 1)<CR>
+        nmap <silent> <buffer> X :call Ywtxt_toc_cmd('toggleFolding', 0, 1)<CR>
+        nmap <silent> <buffer> x :call Ywtxt_toc_cmd('jump', 0, 2)<CR>
+        nmap <silent> <buffer> <leader>< :call Ywtxt_toc_cmd('reindent', 1, 1, 'l')<CR>
+        nmap <silent> <buffer> <leader>> :call Ywtxt_toc_cmd('reindent', 1, 1, 'r')<CR>
+        nmap <silent> <buffer> u :call Ywtxt_toc_cmd('undo', 1, 1)<CR>
+        nmap <silent> <buffer> <c-r> :call Ywtxt_toc_cmd('redo', 1, 1)<CR>
+        nmap <silent> <buffer> w :call Ywtxt_toc_cmd('save', 1, 1)<CR>
+        nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr(b:ywtxt_toc_mom_bufnr) . 'wincmd w'<CR>
+        nmap <silent> <buffer> S :call Ywtxt_toc_cmd('syncheading', 1, 1)<CR>
+        nmap <silent> <buffer> B :call Ywtxt_toc_cmd('genrefs', 1, 1)<CR>
+        nmap <silent> <buffer> E :call Ywtxt_toc_cmd('2html', 1, 2)<CR>
+        nmap <silent> <buffer> A :call Ywtxt_toc_cmd('unfold', 0, 1)<CR>
+    endif
+endfunction "}}}
+
+function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
+    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref')
+    let refsnum = len(refslnlst[0])
+    let line = getline('.')
+    let lnum = line('.')
+    if refsnum != 0
+        for i in range(refsnum)
+            if refslnlst[1][i] < refslnlst[0][i]
+                continue
+            endif
+            if (lnum > refslnlst[0][i]) && (lnum < refslnlst[1][i])
+                let num = matchstr(line, '^\s*\[\zs\d\+\ze\]\s')
+                if num != ''
+                    if i == 0
+                        let ls = 1
+                    else
+                        let ls = refslnlst[1][i-1]
+                    endif
+                    let le = refslnlst[0][i] - 1
+                    let refsdic = <SID>Ywtxt_GetRefLst(ls, le)
+                    if a:k == 't'
+                        call search('\^\[[^]]*\<\zs' . refsdic[num][0] . '\>[^]]*\]', 'bW', ls)
+                        normal zv
+                        return
+                    elseif a:k == 'e'
+                        call <SID>Ywtxt_OpenBibFile(refsdic[num][0])
+                    endif
+                    return
+                endif
+            endif
+        endfor
+    endif
+    let kwd = expand('<cword>')
+    if match(line, '\^\[[^]]*' . kwd . '[^]]*\]') != -1
+        if a:k == 't'
+            echohl MoreMsg | echo <SID>Ywtxt_GetBibEntry(kwd) | echohl None
+        elseif a:k == 'e'
+            call <SID>Ywtxt_OpenBibFile(kwd)
+        endif
+        return
+    elseif match(line, '\*\[[^]]*\]') != -1
+        let endidx = len(line)
+        let cur = col('.')
+        let start = cur - 1
+        let end = cur
+        while 1
+            if start <= 2 && line[start - 1] != '['
+                let start = cur
+                break
+            elseif line[start - 1] == '['
+                break
+            endif
+            let start -= 1
+        endwhile
+        while 1
+            if end >= endidx
+                if (line[end - 1] != ']')
+                    let end = cur
+                endif
+                break
+            elseif (line[end - 1] == ']')
+                break
+            endif
+            let end += 1
+        endwhile
+        if (cur > start) && (cur < end)
+            let hyper = line[start : end - 2]
+            if a:k == 'e' && (hyper != '')
+                let hyperfile = expand(matchstr(hyper, '^[^#]*'))
+                let hyperanchor = escape(matchstr(hyper, '#\zs.*$'), '\')
+                if (hyperfile == '') && (hyperanchor != '')
+                    let hyperfile = expand('%')
+                endif
+                if filereadable(hyperfile)
+                    call <SID>Ywtxt_Jump2File(hyperfile, '\*\@<!\zs\V[#' . hyperanchor . ']', '\%(\*\[#\)\@<!\zs\<\V' . hyperanchor . '\>')
+                    return
+                endif
+            endif
+        endif
+    endif
+    if a:k == 't'
+        silent! normal za
+    elseif a:k == 'e'
+        normal j
+    endif
+endfunction "}}}
+
+function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
+    let refsdic = <SID>Ywtxt_GetRefLst(1, '$')
+    normal zR
+    if exists("a:1")
+        let ls = a:1
+        let le = a:2
+    else
+        let ls = 1
+        let le = line('$')
+    endif
+    if exists("b:ywtxt_cus_headingslst")
+        let ywtxt_cus_headingslst = b:ywtxt_cus_headingslst
+    endif
+    execute ls . ',' . le . 'TOhtml'
+    " Headings
+    if exists("ywtxt_cus_headingslst")
+        let headlen = len(ywtxt_cus_headingslst) - 1
+        if headlen < 4
+            for i in range(1, headlen)
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+            endfor
+            for i in range(headlen + 1, 4)
+                execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (i - ywtxt_cus_headingslst[-1] - 1) . '}\%(#\|\d\+\)&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+            endfor
+            execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (ywtxt_cus_headingslst[-1] - 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
+        elseif headlen == 4
+            for i in range(1, headlen)
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+            endfor
+            execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (ywtxt_cus_headingslst[-1] - 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
+        else
+            for i in range(1, 3)
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+            endfor
+            for i in range(4, headlen)
+                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+            endfor
+        endif
+        execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (headlen + 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
+    else
+        for i in range(1, 4)
+            execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (i-1) . '}\%(#\|\d\+\)&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
+        endfor
+        %s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{4,}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e
+    endif
+    g/^\%(<[^>]\+>\)*\%(&nbsp;\)*\s*%/d " Delete the comment line
+    %s/<b>\zs\*\([^<]*\)\*\ze</\1/ge " boldface
+    %s/<i>\zs\/\([^<]*\)\/\ze</\1/ge " italic
+    %s/<u>\zs_\([^<]*\)_\ze</\1/ge " underlined
+    if len(refsdic) != 0 "  replace the ref keyword with the citing number.
+        for i in range(1, len(refsdic))
+            execute '%s/\^\[[^]]*\zs' . refsdic[i][0] . '\ze[^]]*]/' . i . '/ge'
+        endfor
+    endif
+    %s/\^{\([^}]\+\)}/<sup>\1<\/sup>/ge " superscript html
+    %s/_{\([^}]\+\)}/<sub>\1<\/sub>/ge " subscript html
+    %s/\^\(\[[^]]\+\]\|{[^}]\+}\)/<sup>\1<\/sup>/ge " superscript citing number html
+    %s/\[\s*\f*\.\%(jpg\|png\|bmp\|gif\)\s*\]/\='<img src=' . substitute(submatch(0)[1 : -2], '\s', '%20', 'g') . '>'/gei " pictures
+    if exists("s:ywtxt_browserapp") && executable(s:ywtxt_browserapp)
+        if has("unix")
+            execute 'write | !' . s:ywtxt_browserapp . ' % &'
+        elseif has("win32")
+            execute 'write | !START ' . s:ywtxt_browserapp . ' %'
+        endif
+        bwipeout | redraw!
+    endif
+endfunction "}}}
+" command -bar -range=% YwtxtTOhtml call Ywtxt_ToHtml(<line1>,<line2>)
+
+"{{{ bib supports
 function s:Ywtxt_OpenBibFile(w) " {{{ Open bib file.
     let bibfile = expand(matchstr(getline(searchpos('^% bibfile = ', 'nw')[0]), '^% bibfile = ''\zs[^'']*'))
-    call <SID>Ywtxt_Jump2File(bibfile,'{' . a:w . '\>')
+    call <SID>Ywtxt_Jump2File(bibfile,'{' . a:w . '\>','')
 endfunction "}}}
 
 function s:Ywtxt_GetBibEntry(...) " {{{ Show bib entry
@@ -655,128 +862,9 @@ function s:Ywtxt_GetRefLst(ls, le) "{{{ Get bibs
     call setpos('.', save_cursor)
     return refsdic
 endfunction "}}}
+"}}}
 
-function Ywtxt_keymaps() "{{{ key maps.
-    nmap <silent> <buffer> <Tab> :call Ywtxt_Tab('t')<CR>
-    nmap <silent> <buffer> <Leader>t :call Ywtxt_OpenTOC('Contents')<CR>
-    if match(bufname(""), '_.*_TOC_') == -1 " For mom window
-        nmap <silent> <buffer> <Leader>i :call Ywtxt_CreateHeading(1)<CR>
-        nmap <silent> <buffer> <Leader>o :call Ywtxt_CreateHeading(0)<CR>
-        nmap <silent> <buffer> <Leader><s-o> :call Ywtxt_CreateHeading(-1)<CR>
-        nmap <silent> <buffer> <Leader>q :execute 'silent! bwipeout ' . bufnr('_' . expand("%:t:r") . '_TOC_')<CR>
-        nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr('_' . expand("%:t:r") . '_TOC_') . 'wincmd w'<CR>
-        nmap <silent> <buffer> <CR> :call Ywtxt_Tab('e')<CR>
-        imap <buffer> _ _{}<Left>
-        imap <buffer> ^{ ^{}<Left>
-        imap <buffer> ^[ ^[]<Left>
-        nmap <silent> <buffer> <Leader>I :call Ywtxt_InsertSnip()<CR>
-    else " For toc window
-        nmap <silent> <buffer> t :call Ywtxt_ToggleToc()<CR>
-        nmap <silent> <buffer> J :call Ywtxt_toc_cmd('outlinemove', 0, 1, 'j')<CR>
-        nmap <silent> <buffer> K :call Ywtxt_toc_cmd('outlinemove', 0, 1, 'k')<CR>
-        nmap <silent> <buffer> q :bwipeout<CR>
-        nmap <silent> <buffer> r :call Ywtxt_OpenTOC(b:ywtxt_toc_type)<CR>
-        nmap <silent> <buffer> <Space> :call Ywtxt_toc_cmd('jump', 0, 0)<CR>
-        nmap <silent> <buffer> <Enter> :call Ywtxt_toc_cmd('jump', 0, 1)<CR>
-        nmap <silent> <buffer> X :call Ywtxt_toc_cmd('toggleFolding', 0, 1)<CR>
-        nmap <silent> <buffer> x :call Ywtxt_toc_cmd('jump', 0, 2)<CR>
-        nmap <silent> <buffer> <leader>< :call Ywtxt_toc_cmd('reindent', 1, 1, 'l')<CR>
-        nmap <silent> <buffer> <leader>> :call Ywtxt_toc_cmd('reindent', 1, 1, 'r')<CR>
-        nmap <silent> <buffer> u :call Ywtxt_toc_cmd('undo', 1, 1)<CR>
-        nmap <silent> <buffer> <c-r> :call Ywtxt_toc_cmd('redo', 1, 1)<CR>
-        nmap <silent> <buffer> w :call Ywtxt_toc_cmd('save', 1, 1)<CR>
-        nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr(b:ywtxt_toc_mom_bufnr) . 'wincmd w'<CR>
-        nmap <silent> <buffer> S :call Ywtxt_toc_cmd('syncheading', 1, 1)<CR>
-        nmap <silent> <buffer> B :call Ywtxt_toc_cmd('genrefs', 1, 1)<CR>
-        nmap <silent> <buffer> E :call Ywtxt_toc_cmd('2html', 1, 2)<CR>
-        nmap <silent> <buffer> A :call Ywtxt_toc_cmd('unfold', 0, 1)<CR>
-    endif
-endfunction "}}}
-
-function Ywtxt_ToggleToc() "{{{ Toggle toc type
-    let toctypelst = ['Contents', 'Figure', 'Table']
-    let typeidx = index(toctypelst, b:ywtxt_toc_type)
-    if typeidx != (len(toctypelst) - 1)
-        let typeidx += 1
-    else
-        let typeidx = 0
-    endif
-    call Ywtxt_OpenTOC(toctypelst[typeidx])
-endfunction "}}}
-
-function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
-    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref')
-    let refsnum = len(refslnlst[0])
-    let line = getline('.')
-    let lnum = line('.')
-    if refsnum != 0
-        for i in range(refsnum)
-            if refslnlst[1][i] < refslnlst[0][i]
-                continue
-            endif
-            if (lnum > refslnlst[0][i]) && (lnum < refslnlst[1][i])
-                let num = matchstr(line, '^\s*\[\zs\d\+\ze\]\s')
-                if num != ''
-                    if i == 0
-                        let ls = 1
-                    else
-                        let ls = refslnlst[1][i-1]
-                    endif
-                    let le = refslnlst[0][i] - 1
-                    let refsdic = <SID>Ywtxt_GetRefLst(ls, le)
-                    if a:k == 't'
-                        call search('\^\[[^]]*\<\zs' . refsdic[num][0] . '\>[^]]*\]', 'bW', ls)
-                        normal zv
-                        return
-                    elseif a:k == 'e'
-                        call <SID>Ywtxt_OpenBibFile(refsdic[num][0])
-                    endif
-                    return
-                endif
-            endif
-        endfor
-    endif
-    let kwd = expand('<cword>')
-    if match(line, '\^\[[^]]*' . kwd . '[^]]*\]') != -1
-        if a:k == 't'
-            echohl MoreMsg | echo <SID>Ywtxt_GetBibEntry(kwd) | echohl None
-        elseif a:k == 'e'
-            call <SID>Ywtxt_OpenBibFile(kwd)
-        endif
-        return
-    elseif match(line, '\*\[[^]]*\]') != -1
-        let endidx = len(line) - 1
-        let cur = col('.')
-        let start = cur - 1
-        let end = cur + 1
-        while (start > 0) && (line[start - 1] != '[')
-            let start -= 1
-        endwhile
-        while (end < endidx) && (line[end + 1] != ']')
-            let end += 1
-        endwhile
-        if (cur >= start) && (cur < end)
-            let hyper = line[start : end]
-            if a:k == 'e' && (hyper != '')
-                let hyperfile = expand(matchstr(hyper, '^[^#]*'))
-                let hyperanchor = matchstr(hyper, '#\zs.*$')
-                if (hyperfile == '') && (hyperanchor != '')
-                    let hyperfile = expand('%')
-                endif
-                if filereadable(hyperfile)
-                    call <SID>Ywtxt_Jump2File(hyperfile, '\V' . escape(hyperanchor, '\'))
-                    return
-                endif
-            endif
-        endif
-    endif
-    if a:k == 't'
-        silent! normal za
-    elseif a:k == 'e'
-        normal j
-    endif
-endfunction "}}}
-
+"{{{ snip
 function Ywtxt_InsertSnip() "{{{ Insert snip.
     echohl ModeMsg
     let ftsnip = input("snip type: ", "", "customlist,Ywtxt_ListFt")
@@ -786,6 +874,19 @@ function Ywtxt_InsertSnip() "{{{ Insert snip.
     normal O
     call <SID>Ywtxt_SynSnip(ftsnip)
     startinsert
+endfunction "}}}
+
+function Ywtxt_ListFt(A,L,P) "{{{ Completion func for snip filetypes to insert in cmdline
+    let comp = {}
+    for p in split(&runtimepath, ',')
+        for f in split(globpath(p.'/syntax/', '*.vim'), '\n')
+            let ft = matchstr(f, '[^/]*\ze\.vim$')
+            if match(ft, '^'.a:L) != -1
+                let comp[ft] = ''
+            endif
+        endfor
+    endfor
+    return keys(comp)
 endfunction "}}}
 
 function Ywtxt_FindSnipft() "{{{ Check the Snip filetypes
@@ -803,117 +904,10 @@ function Ywtxt_FindSnipft() "{{{ Check the Snip filetypes
     endfor
     call setpos('.', save_cursor)
 endfunction "}}}
+"}}}
 
-function s:Ywtxt_SynSnip(ftsnip,...) "{{{ Syntax for snip
-    if !exists('b:ywtxt_ftsnipsdic')
-        let b:ywtxt_ftsnipsdic = {}
-    endif
-    if !has_key(b:ywtxt_ftsnipsdic, a:ftsnip)
-        let begin = '^\s*% BEGINSNIP ' . a:ftsnip
-        let end = '^\s*% ENDSNIP'
-        if exists("a:1")
-            let begin = a:1
-        endif
-        if exists("a:2")
-            let end = a:2
-        endif
-        if exists("b:current_syntax")
-            let oldcurrent_syntax = b:current_syntax
-            unlet b:current_syntax
-        endif
-        execute 'syntax include @ywtxt_snip' . a:ftsnip . ' syntax/' . a:ftsnip . '.vim'
-        execute 'syntax region ywtxt_snip' . a:ftsnip . 'Snip matchgroup=Comment start="' . begin . '" end="' . end . '" contains=@ywtxt_snip' . a:ftsnip
-        let b:ywtxt_ftsnipsdic[a:ftsnip] = ''
-        unlet b:current_syntax
-        if exists("oldcurrent_syntax")
-            let b:current_syntax = oldcurrent_syntax
-        endif
-    endif
-endfunction "}}}
-
-function Ywtxt_ListFt(A,L,P) "{{{ Completion func for snip filetypes to insert in cmdline
-    let comp = {}
-    for p in split(&runtimepath, ',')
-        for f in split(globpath(p.'/syntax/', '*.vim'), '\n')
-            let ft = matchstr(f, '[^/]*\ze\.vim$')
-            if match(ft, '^'.a:L) != -1
-                let comp[ft] = ''
-            endif
-        endfor
-    endfor
-    return keys(comp)
-endfunction "}}}
-
-function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
-    let refsdic = <SID>Ywtxt_GetRefLst(1, '$')
-    normal zR
-    if exists("a:1")
-        let ls = a:1
-        let le = a:2
-    else
-        let ls = 1
-        let le = line('$')
-    endif
-    if exists("b:ywtxt_cus_headingslst")
-        let ywtxt_cus_headingslst = b:ywtxt_cus_headingslst
-    endif
-    execute ls . ',' . le . 'TOhtml'
-    " Headings
-    if exists("ywtxt_cus_headingslst")
-        let headlen = len(ywtxt_cus_headingslst) - 1
-        if headlen < 4
-            for i in range(1, headlen)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
-            endfor
-            for i in range(headlen + 1, 4)
-                execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (i - ywtxt_cus_headingslst[-1] - 1) . '}\%(#\|\d\+\)&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
-            endfor
-            execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (ywtxt_cus_headingslst[-1] - 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
-        elseif headlen == 4
-            for i in range(1, headlen)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
-            endfor
-            execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (ywtxt_cus_headingslst[-1] - 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
-        else
-            for i in range(1, 3)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
-            endfor
-            for i in range(4, headlen)
-                execute '%s/^\(\%(<[^>]\+>\)*' . substitute(escape(ywtxt_cus_headingslst[i-1], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . '&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
-            endfor
-        endif
-        execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (headlen + 1) . ',}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e'
-    else
-        for i in range(1, 4)
-            execute '%s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{' . (i-1) . '}\%(#\|\d\+\)&nbsp;&nbsp;.*$\)/<h' . i . '>\1<\/h' . i . '>/e'
-        endfor
-        %s/^\(\%(<[^>]\+>\)*\%(\%(#\|\d\+\)\.\)\{4,}\%(#\|\d\+\)&nbsp;&nbsp;.*\)/<h4>\1<\/h4>/e
-    endif
-    g/^\%(<[^>]\+>\)*\%(&nbsp;\)*\s*%/d " Delete the comment line
-    %s/<b>\zs\*\([^<]*\)\*\ze</\1/ge " boldface
-    %s/<i>\zs\/\([^<]*\)\/\ze</\1/ge " italic
-    %s/<u>\zs_\([^<]*\)_\ze</\1/ge " underlined
-    if len(refsdic) != 0 "  replace the ref keyword with the citing number.
-        for i in range(1, len(refsdic))
-            execute '%s/\^\[[^]]*\zs' . refsdic[i][0] . '\ze[^]]*]/' . i . '/ge'
-        endfor
-    endif
-    %s/\^{\([^}]\+\)}/<sup>\1<\/sup>/ge " superscript html
-    %s/_{\([^}]\+\)}/<sub>\1<\/sub>/ge " subscript html
-    %s/\^\(\[[^]]\+\]\|{[^}]\+}\)/<sup>\1<\/sup>/ge " superscript citing number html
-    %s/\[\s*\f*\.\%(jpg\|png\|bmp\|gif\)\s*\]/\='<img src=' . substitute(submatch(0)[1 : -2], '\s', '%20', 'g') . '>'/gei " pictures
-    if exists("s:ywtxt_browserapp") && executable(s:ywtxt_browserapp)
-        if has("unix")
-            execute 'write | !' . s:ywtxt_browserapp . ' % &'
-        elseif has("win32")
-            execute 'write | !START ' . s:ywtxt_browserapp . ' %'
-        endif
-        bwipeout | redraw!
-    endif
-endfunction "}}}
-" command -bar -range=% YwtxtTOhtml call Ywtxt_ToHtml(<line1>,<line2>)
-
-function Ywtxt_GetHeadingsPat() "{{{ Get patten of headings for syntax. FIXME: ugly.
+" {{{ syntax & highlight
+function Ywtxt_Syntax_HeadingsPat() "{{{ Syntax the patten of headings. FIXME: ugly.
     if exists("b:ywtxt_cus_headingslst")
         if match(bufname(""), '_.*_TOC_') == -1 " mom window
             let head = '^'
@@ -958,5 +952,33 @@ else
     endfor
 endif
 endfunction "}}}
+
+function s:Ywtxt_SynSnip(ftsnip,...) "{{{ Syntax for snip
+    if !exists('b:ywtxt_ftsnipsdic')
+        let b:ywtxt_ftsnipsdic = {}
+    endif
+    if !has_key(b:ywtxt_ftsnipsdic, a:ftsnip)
+        let begin = '^\s*% BEGINSNIP ' . a:ftsnip
+        let end = '^\s*% ENDSNIP'
+        if exists("a:1")
+            let begin = a:1
+        endif
+        if exists("a:2")
+            let end = a:2
+        endif
+        if exists("b:current_syntax")
+            let oldcurrent_syntax = b:current_syntax
+            unlet b:current_syntax
+        endif
+        execute 'syntax include @ywtxt_snip' . a:ftsnip . ' syntax/' . a:ftsnip . '.vim'
+        execute 'syntax region ywtxt_snip' . a:ftsnip . 'Snip matchgroup=Comment start="' . begin . '" end="' . end . '" contains=@ywtxt_snip' . a:ftsnip
+        let b:ywtxt_ftsnipsdic[a:ftsnip] = ''
+        unlet b:current_syntax
+        if exists("oldcurrent_syntax")
+            let b:current_syntax = oldcurrent_syntax
+        endif
+    endif
+endfunction "}}}
+" }}}
 
 " vim: foldmethod=marker:
