@@ -119,7 +119,7 @@ function s:Ywtxt_Jump2File(f,a,b) "{{{ Jump to file
     endif
     if a:a != ''
         if search(a:a, 'w') == 0
-            echohl ErrorMsg | echo "Unknown location! Try to find normal string." | echohl NONE
+            echohl ErrorMsg | echo "ywtxt: Unknown location! Try to find a normal string instead." | echohl NONE
             call search(a:b, 'w')
         endif
         normal zvzz
@@ -519,6 +519,7 @@ function Ywtxt_keymaps() "{{{ key maps.
         nmap <silent> <buffer> <CR> :call Ywtxt_Tab('e')<CR>
         imap <buffer> ^{ ^{}<Left>
         imap <buffer> ^[ ^[]<Left>
+        imap <buffer> _{ _{}<Left>
         nmap <silent> <buffer> <Leader>I :call Ywtxt_InsertSnip()<CR>
     else " For toc window
         nmap <silent> <buffer> t :call Ywtxt_ToggleToc()<CR>
@@ -583,7 +584,7 @@ function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
             call <SID>Ywtxt_OpenBibFile(kwd)
         endif
         return
-    elseif match(line, '\*\[[^]]*\]') != -1
+    elseif match(line, '\*\[[^]]*\]') != -1 " cross-reference
         let endidx = len(line)
         let cur = col('.')
         let start = cur - 1
@@ -617,7 +618,11 @@ function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
                     let hyperfile = expand('%')
                 endif
                 if filereadable(hyperfile)
-                    call <SID>Ywtxt_Jump2File(hyperfile, '\*\@<!\zs\V[#' . hyperanchor . ']', '\%(\*\[#\)\@<!\zs\<\V' . hyperanchor . '\>')
+                    if hyperanchor =~ '[^\x00-\xff]'
+                        call <SID>Ywtxt_Jump2File(hyperfile, '\*\@<!\zs\V[#' . hyperanchor . ']', '\%(\*\[#\)\@<!\zs\V' . hyperanchor)
+                    else
+                        call <SID>Ywtxt_Jump2File(hyperfile, '\*\@<!\zs\V[#' . hyperanchor . ']', '\%(\*\[#\)\@<!\zs\V\<' . hyperanchor . '\>')
+                    endif
                     return
                 endif
             endif

@@ -21,10 +21,10 @@ highlight default link ywtxt_note Todo
 
 syntax match ywtxt_ref '\^\[[^]]*\]'
 highlight default link ywtxt_ref Comment
-syntax match ywtxt_url '\*\[#[^]]*\]'
-highlight default link ywtxt_url String
+syntax match ywtxt_url '\*\[[^]]*\]'
+highlight default link ywtxt_url Identifier
 syntax match ywtxt_anchor '\*\@<!\[#[^]]*\]'
-highlight default link ywtxt_anchor Identifier
+highlight default link ywtxt_anchor String
 
 syntax match ywtxt_comment '^\s*%.*$' contains=ALL
 highlight default link ywtxt_comment Comment
