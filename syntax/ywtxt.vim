@@ -30,10 +30,10 @@ syntax match ywtxt_comment '^\s*%.*$' contains=ALL
 highlight default link ywtxt_comment Comment
 
 if match(bufname(""), '_.*_TOC_') == -1 " For mom window
-  syntax match ywtxt_Fig '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\.\s\s'
+  syntax match ywtxt_Fig '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\%(\|-\%(#\|\d\+\)\)\.\s\s'
   syntax match ywtxt_Tab '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\.\s\s'
 else " For mom window
-  syntax match ywtxt_Fig '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\.\s'
+  syntax match ywtxt_Fig '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\%(\|-\%(#\|\d\+\)\)\.\s'
   syntax match ywtxt_Tab '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\.\s'
 endif
 highlight default link ywtxt_Fig Comment

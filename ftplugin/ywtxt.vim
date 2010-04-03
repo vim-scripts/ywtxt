@@ -13,7 +13,9 @@ if match(bufname(""), '_.*_TOC_') == 0 " For toc window
 else " For mom window
 endif
 
-setlocal comments=":%"
+setlocal comments=:%
+setlocal isf-=[
+setlocal formatoptions+=ro
 
 call Ywtxt_FindSnipft()
 call Ywtxt_keymaps()

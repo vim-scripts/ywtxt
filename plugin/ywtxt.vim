@@ -153,7 +153,6 @@ function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
             setlocal bufhidden=hide
             setlocal noswapfile
             setlocal filetype=ywtxt
-            setlocal nowrap
             execute 'setlocal textwidth=' . tocwidth
             let b:ywtxt_toc_mom_bufnr = bufnr
         elseif bufwnr != -1
@@ -362,13 +361,13 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
             let tail = matchstr(line, '^\%(.\{-}\s\s\)\{1}\zs.*')
             let realsecnum = secnum . '  '
             let displaysecnum = repeat('  ', (hlevel - 1)) . secnum . ' '
-        else
+        else " TODO Figure #-#., Table #-#.. First # is chapter number.
             if a:t == 'Figure'
                 " Figure TOC gerneration
-                let pat = '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\.\ze\s\s'
+                let pat = '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\%(\|-\%(#\|\d\+\)\)\.\ze\s\s'
             elseif a:t == 'Table'
                 " Table TOC gerneration
-                let pat = '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\.\ze\s\s'
+                let pat = '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\%(\|-\%(#\|\d\+\)\)\.\ze\s\s'
             endif
             let heading = matchstr(line, pat)
             if heading == ''
