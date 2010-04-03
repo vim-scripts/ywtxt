@@ -873,9 +873,11 @@ function Ywtxt_InsertSnip() "{{{ Insert snip.
     echohl ModeMsg
     let ftsnip = input("snip type: ", "", "customlist,Ywtxt_ListFt")
     echohl None
-    execute 'normal o% BEGINSNIP ' . ftsnip
-    execute 'normal o% ENDSNIP'
-    normal O
+    setlocal nofoldenable
+    call append('.', ['% BEGINSNIP ' . ftsnip, "", '% ENDSNIP'])
+    normal jj
+    setlocal foldenable
+    normal zv
     call <SID>Ywtxt_SynSnip(ftsnip)
     startinsert
 endfunction "}}}
