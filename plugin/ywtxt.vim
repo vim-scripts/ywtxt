@@ -97,9 +97,7 @@ function s:Ywtxt_WinJump(n) "{{{ Mom win <-> toc win
             execute bufwinnr . 'wincmd w'
             execute 'normal ' . l . 'Gzvzz'
         endif
-        if a:n == 0
-            wincmd p
-        elseif a:n == 2
+        if a:n == 2
             execute 'bwipeout ' . bufnr
         endif
     else
@@ -498,7 +496,9 @@ function Ywtxt_toc_cmd(op,pos,jumpp,...) "{{{ command on mom file in toc window.
             normal zR
         endif
     endif
-    call setpos('.', save_cursor)
+    if a:jumpp
+        call setpos('.', save_cursor)
+    endif
     wincmd p
     if a:op =~ '\%(genrefs\|reindent\|undo\|redo\)'
         silent call Ywtxt_OpenTOC('Contents')
