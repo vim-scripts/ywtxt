@@ -12,6 +12,9 @@ call Ywtxt_SearchHeadingPat()
 syntax match ywtxt_title /\%^\_.\{-}\zs\s\+\zs\S.*\ze\s\+$/ contains=ALL
 highlight default link ywtxt_title Title
 
+syntax match ywtxt_footnote /^\s*\%(footnote\|注\):/ contained
+highlight default link ywtxt_footnote Comment
+
 syntax keyword ywtxt_done DONE
 highlight default link ywtxt_done Comment
 syntax keyword ywtxt_todo FIXME TODO
@@ -39,13 +42,19 @@ endif
 highlight default link ywtxt_Fig Comment
 highlight default link ywtxt_Tab Comment
 
-syntax match ywtxt_bold '\%(\s\|^\)\zs\*\S[^*]*\S\*\ze\%(\s\|$\)'
+" TODO
+" syntax match ywtxt_boldl contained '\%(\s\|^\)\zs\*\ze\S[^*]*\S\*\%(\s\|$\)'
+" syntax match ywtxt_boldr contained '\%(\s\|^\)\*\S[^*]*\S\zs\*\ze\%(\s\|$\)'
+" highlight default link ywtxt_boldl Ignore
+" highlight default link ywtxt_boldr Ignore
+" syntax match ywtxt_bold '\%(\s\|^\)\*\zs\S[^*]*\S\ze\*\%(\s\|$\)' contains=ywtxt_boldl,ywtxt_boldr
+syntax match ywtxt_bold '\%(\s\|^\)\zs\*\S[^*]*\S\*\ze\%([[:punct:]]\|\s\|$\)'
 highlight ywtxt_bold term=bold cterm=bold gui=bold
 
-syntax match ywtxt_underline '\%(\s\|^\)\zs_\S[^_]*\S_\ze\%(\s\|$\)'
+syntax match ywtxt_underline '\%(\s\|^\)\zs_\S[^_]*\S_\ze\%([[:punct:]]\|\s\|$\)'
 highlight ywtxt_underline term=underline cterm=underline gui=underline
 
-syntax match ywtxt_italic '\%(\s\|^\)\zs/\S[^/]*\S/\ze\%(\s\|$\)'
+syntax match ywtxt_italic '\%(\s\|^\)\zs/\S[^/]*\S/\ze\%([[:punct:]]\|\s\|$\)'
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
 call Ywtxt_Syntax_HeadingsPat()

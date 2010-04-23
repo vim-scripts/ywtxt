@@ -24,6 +24,10 @@ if exists("g:ywtxt_HeadingsPat")
     let s:ywtxt_HeadingsPat = g:ywtxt_HeadingsPat
     unlet g:ywtxt_HeadingsPat
 endif
+let s:ywtxt_autonumber = 0
+if exists("g:ywtxt_autonumber")
+    let s:ywtxt_autonumber = g:ywtxt_autonumber
+endif
 
 if exists("g:ywtxt_browserapp")
     let s:ywtxt_browserapp = g:ywtxt_browserapp
@@ -385,7 +389,26 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
     return [toclst, n] " n: curren section
 endfunction "}}}
 
-function Ywtxt_CreateHeading(l) "{{{ Create Heading.
+function Ywtxt_Dialog(t) "{{{ Dialog
+    if a:t == 'CreatHeading'
+        echohl MoreMsg | echo "Open New (P)arent/Current/(C)hild/(R)eference/(S)nip?" | echohl None
+        let l = nr2char(getchar())
+        if l =~ '[Pp]'
+            call <SID>Ywtxt_CreateHeading('heading', -1)
+        elseif l =~ '[Cc]'
+            call <SID>Ywtxt_CreateHeading('heading', 1)
+        elseif l =~ '[Rr]'
+            call <SID>Ywtxt_CreateHeading('Ref', 0)
+        elseif l =~ '[Ss]'
+            call <SID>Ywtxt_InsertSnip()
+        else
+            call <SID>Ywtxt_CreateHeading('heading', 0)
+        endif
+        return ''
+    endif
+endfunction "}}}
+
+function s:Ywtxt_CreateHeading(t, l) "{{{ Create Heading.
     let fl = foldlevel(".")
     let ln = foldclosedend('.')
     if ln == -1
@@ -413,7 +436,22 @@ function Ywtxt_CreateHeading(l) "{{{ Create Heading.
     else
         let heading = '#  '
     endif
-    execute ln . "put ='" . heading . "'"
+    if a:t == 'heading'
+        execute ln . "put ='" . heading . "'"
+    elseif a:t == 'ref'
+        setlocal nofoldenable
+        call append(ln, [heading . s:ywtxt_biblioname, "", "% bibfile = '" . input("Bib file? ", './', 'file') . "'"])
+        normal jj
+        setlocal foldenable
+    endif
+    if s:ywtxt_autonumber
+        let save_cursor = getpos(".")
+        let toclst = <SID>Ywtxt_GetHeadings('Contents')
+        for l in toclst[0]
+            call setline(l[2], l[3] . l[1])
+        endfor
+        call setpos('.', save_cursor)
+    endif
     normal zv
     startinsert!
 endfunction "}}}
@@ -510,16 +548,14 @@ function Ywtxt_keymaps() "{{{ key maps.
     nmap <silent> <buffer> <Tab> :call Ywtxt_Tab('t')<CR>
     nmap <silent> <buffer> <Leader>t :call Ywtxt_OpenTOC('Contents')<CR>
     if match(bufname(""), '_.*_TOC_') == -1 " For mom window
-        nmap <silent> <buffer> <Leader>i :call Ywtxt_CreateHeading(1)<CR>
-        nmap <silent> <buffer> <Leader>o :call Ywtxt_CreateHeading(0)<CR>
-        nmap <silent> <buffer> <Leader><s-o> :call Ywtxt_CreateHeading(-1)<CR>
+        nmap <silent> <buffer> <C-j> :call Ywtxt_Dialog("CreatHeading")<CR>
         nmap <silent> <buffer> <Leader>q :execute 'silent! bwipeout ' . bufnr('_' . expand("%:t:r") . '_TOC_')<CR>
         nmap <silent> <buffer> <Leader><tab> :execute 'silent! ' . bufwinnr('_' . expand("%:t:r") . '_TOC_') . 'wincmd w'<CR>
         nmap <silent> <buffer> <CR> :call Ywtxt_Tab('e')<CR>
-        imap <buffer> ^{ ^{}<Left>
-        imap <buffer> ^[ ^[]<Left>
-        imap <buffer> _{ _{}<Left>
-        nmap <silent> <buffer> <Leader>I :call Ywtxt_InsertSnip()<CR>
+        imap <silent> <buffer> <C-j> <C-R>=Ywtxt_Dialog("CreatHeading")<CR>
+        imap <silent> <buffer> ^{ ^{}<Left>
+        imap <silent> <buffer> ^[ ^[]<Left>
+        imap <silent> <buffer> _{ _{}<Left>
     else " For toc window
         nmap <silent> <buffer> t :call Ywtxt_ToggleToc()<CR>
         nmap <silent> <buffer> J :call Ywtxt_toc_cmd('outlinemove', 0, 1, 'j')<CR>
@@ -869,7 +905,7 @@ endfunction "}}}
 "}}}
 
 "{{{ snip
-function Ywtxt_InsertSnip() "{{{ Insert snip.
+function s:Ywtxt_InsertSnip() "{{{ Insert snip.
     echohl ModeMsg
     let ftsnip = input("snip type: ", "", "customlist,Ywtxt_ListFt")
     echohl None
@@ -986,5 +1022,5 @@ function s:Ywtxt_SynSnip(ftsnip,...) "{{{ Syntax for snip
     endif
 endfunction "}}}
 " }}}
-
+" TODO autocmd InsertLeave *.ywtxt refresh toc
 " vim: foldmethod=marker:
