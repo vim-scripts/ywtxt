@@ -9,7 +9,7 @@ scriptencoding utf-8
 
 call Ywtxt_SearchHeadingPat()
 
-syntax match ywtxt_title /\%^\_.\{-}\zs\s\+\zs\S.*\ze\s\+$/ contains=ALL
+syntax match ywtxt_title /\%^\s\+\S.*\s$/ contains=ALL
 highlight default link ywtxt_title Title
 
 syntax match ywtxt_footnote /^\s*\%(footnote\|注\):/ contained
@@ -48,13 +48,13 @@ highlight default link ywtxt_Tab Comment
 " highlight default link ywtxt_boldl Ignore
 " highlight default link ywtxt_boldr Ignore
 " syntax match ywtxt_bold '\%(\s\|^\)\*\zs\S[^*]*\S\ze\*\%(\s\|$\)' contains=ywtxt_boldl,ywtxt_boldr
-syntax match ywtxt_bold '\%(\s\|^\)\zs\*\S[^*]*\S\*\ze\%([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_bold '\%(\s\|^\|[^\x00-\xff]\)\zs\*[^*[:blank:][:punct:]，。!:“”；‘’]\+\*\ze\%([[:punct:]]\|\s\|$\|[^\x00-\xff]\)'
 highlight ywtxt_bold term=bold cterm=bold gui=bold
 
-syntax match ywtxt_underline '\%(\s\|^\)\zs_\S[^_]*\S_\ze\%([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_underline '\%(\s\|^\|[^\x00-\xff]\)\zs_[^_[:blank:][:punct:]，。!:“”；‘’]\+_\ze\%([[:punct:]]\|\s\|$\|[^\x00-\xff]\)'
 highlight ywtxt_underline term=underline cterm=underline gui=underline
 
-syntax match ywtxt_italic '\%(\s\|^\)\zs/\S[^/]*\S/\ze\%([[:punct:]]\|\s\|$\)'
+syntax match ywtxt_italic '\%(\s\|^\|[^\x00-\xff]\)\zs/[^/[:blank:][:punct:]，。!:“”；‘’]\+/\ze\%([[:punct:]]\|\s\|$\|[^\x00-\xff]\)'
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
 call Ywtxt_Syntax_HeadingsPat()
