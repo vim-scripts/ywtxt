@@ -102,9 +102,9 @@ function Ywtxt_FoldExpr(l) "{{{ Folding rule.
             let b:ywtxt_snip_in += 1
         endif
         return 'a1'
-    elseif match(line, '^\s*% BEGINSNIP') == 0
+    elseif match(line, '^% BEGINSNIP') == 0
         return 'a1'
-    elseif match(line, '^\s*% ENDSNIP') == 0
+    elseif match(line, '^% ENDSNIP') == 0
         if exists("b:ywtxt_snip_in")
             if b:ywtxt_snip_in == 1
                 unlet b:ywtxt_snip_in
@@ -112,6 +112,10 @@ function Ywtxt_FoldExpr(l) "{{{ Folding rule.
                 let b:ywtxt_snip_in -= 1
             endif
         endif
+        return 's1'
+    elseif match(line, '^% BEGIN_NOHTML') == 0
+        return 'a1'
+    elseif match(line, '^% END_NOHTML') == 0
         return 's1'
     endif
     if exists("b:ywtxt_snip_in")
@@ -214,31 +218,59 @@ function Ywtxt_OpenTOC(t) "{{{ Open and refresh toc.
 endfunction "}}}
 
 function Ywtxt_ToggleToc() "{{{ Toggle toc type
-    let toctypelst = ['Contents', 'Figure', 'Table']
-    let typeidx = index(toctypelst, b:ywtxt_toc_type)
-    if typeidx != (len(toctypelst) - 1)
-        let typeidx += 1
+    echohl MoreMsg | echo "Con(t)ents/(F)igures/Ta(b)les/(A)nchors/(L)inks" | echohl None
+    let t = nr2char(getchar())
+    if t =~ '[Tt]'
+        call Ywtxt_OpenTOC('Contents')
+    elseif t =~ '[Ff]'
+        call Ywtxt_OpenTOC('Figures')
+    elseif t =~ '[Bb]'
+        call Ywtxt_OpenTOC('Tables')
+    elseif t =~ '[Aa]'
+        call Ywtxt_OpenTOC('Anchors')
+    elseif t =~ '[Ll]'
+        call Ywtxt_OpenTOC('Links')
     else
-        let typeidx = 0
+        call Ywtxt_OpenTOC('Contents')
     endif
-    call Ywtxt_OpenTOC(toctypelst[typeidx])
 endfunction "}}}
 
-function s:Ywtxt_ReturnPairRegion(t) "{{{ Return pair region line numbers.
+function s:Ywtxt_ReturnPairRegion(t,n) "{{{ Return pair region line numbers.
+    " a:t: type; a:n can(1)/can't(0) nested.
     let returnpair_save_cursor = getpos(".")
     let leftlist = []
     let rightlist = []
     if a:t == 'ref'
         let lp = "^% bibfile = '"
         let rp = "^% endbib"
+    elseif a:t == 'nonexport2html'
+        let lp = "^% BEGIN_NOHTML"
+        let rp = "^% END_NOHTML"
     elseif a:t == 'snip'
         let lp = '^\s*% BEGINSNIP\s'
         let rp = '^\s*% ENDSNIP'
     endif
     execute 'silent g/' . lp . '/call add(leftlist, line("."))'
     execute 'silent g/' . rp . '/call add(rightlist, line("."))'
+    let l = len(leftlist)
+    let r = len(rightlist)
+    let p = 0
+    if (l == r) && (r != 0)
+        let p = l
+        if a:n == 0
+            for i in range(l)
+                if i
+                    if rightlist[i-1] > leftlist[i]
+                        let p = 0
+                        break
+                    endif
+                endif
+            endfor
+        endif
+    endif
     call setpos('.', returnpair_save_cursor)
-    return [leftlist, rightlist]
+    return [leftlist, rightlist, p]
+    " [leftlist, rightlist, region paired(1) or not(0)]
 endfunction "}}}
 
 function Ywtxt_SearchHeadingPat() "{{{ search heading patten
@@ -276,10 +308,11 @@ endfunction "}}}
 function s:Ywtxt_ReturnHeadingName(l) "{{{ Get heading name.
     " a:l: level.
     if exists("b:ywtxt_cus_headingslst")
-        if len(b:ywtxt_cus_headingslst) > a:l
+        let cuslen = len(b:ywtxt_cus_headingslst)
+        if cuslen > a:l
             return b:ywtxt_cus_headingslst[a:l - 1]
         else
-            return repeat('#.', (a:l - b:ywtxt_cus_headingslst[-1] - 1)) . '#'
+            return repeat('#.', (a:l - cuslen + 1)) . '#'
         endif
     endif
     return repeat('#.', (a:l - 1)) . '#'
@@ -298,7 +331,7 @@ function s:Ywtxt_HeadingP(l,...) "{{{ Return the heading level, 0 if not.
     let headinglen = len(split(matchstr(line, head . s:ywtxt_def_headingpat . '\ze' . tail), '\.'))
     if exists("b:ywtxt_cus_headingslst")
         if headinglen >= b:ywtxt_cus_headingslst[-1]
-            return len(b:ywtxt_cus_headingslst[:-2]) + headinglen - 1
+            return len(b:ywtxt_cus_headingslst[:-2]) - 1 + headinglen
         else
             for i in range(len(b:ywtxt_cus_headingslst[:-2]))
                 if match(line, head . substitute(escape(b:ywtxt_cus_headingslst[i], '\.'), '#', '\\%(\\d\\+\\|#\\)', '') . tail) == 0
@@ -306,8 +339,9 @@ function s:Ywtxt_HeadingP(l,...) "{{{ Return the heading level, 0 if not.
                 endif
             endfor
         endif
+    else
+        return headinglen
     endif
-    return headinglen
 endfunction "}}}
 
 function s:Ywtxt_GetHeadings(t) "{{{ Get headings
@@ -393,12 +427,18 @@ function s:Ywtxt_GetHeadings(t) "{{{ Get headings
             let realsecnum = secnum . '  '
             let displaysecnum = repeat('  ', (hlevel - 1)) . secnum . ' '
         else " TODO Figure #-#., Table #-#.. First # is chapter number.
-            if a:t == 'Figure'
+            if a:t == 'Figures'
                 " Figure TOC gerneration
                 let pat = '^\s*\%(\cFig\%(\.\|ure\)\|图\)\s\%(#\|\d\+\)\%(\|-\%(#\|\d\+\)\)\.\ze  '
-            elseif a:t == 'Table'
+            elseif a:t == 'Tables'
                 " Table TOC gerneration
                 let pat = '^\s*\%(\cTable\|表\)\s\%(#\|\d\+\)\%(\|-\%(#\|\d\+\)\)\.\ze  '
+            elseif a:t == 'Anchors'
+                " Anchor TOC gerneration
+                let pat = '\%(\*\)\@<!\[#[^]]\+\]'
+            elseif a:t == 'Links'
+                " Hyperlink TOC gerneration
+                let pat = '\*\[#[^]]\+\]'
             endif
             let heading = matchstr(line, pat)
             if heading == ''
@@ -420,7 +460,7 @@ endfunction "}}}
 
 function Ywtxt_Dialog(t) "{{{ Dialog
     if a:t == 'CreatHeading'
-        echohl MoreMsg | echo "Open New (P)arent/Current/(C)hild/(O)ther/(R)eference/(S)nip?" | echohl None
+        echohl MoreMsg | echo "Open New (P)arent/Current/(C)hild/(O)ther/(%)Non_export2html/(R)eference/(S)nip?" | echohl None
         let l = nr2char(getchar())
         if l =~ '[Pp]'
             call <SID>Ywtxt_CreateHeading('heading', -1)
@@ -431,6 +471,8 @@ function Ywtxt_Dialog(t) "{{{ Dialog
             if lev =~ '\d\+'
                 call <SID>Ywtxt_CreateHeading('heading', lev)
             endif
+        elseif l == '%'
+            call <SID>Ywtxt_CreateHeading('nonexport2html', 0)
         elseif l =~ '[Rr]'
             call <SID>Ywtxt_CreateHeading('Ref', 0)
         elseif l =~ '[Ss]'
@@ -443,6 +485,7 @@ function Ywtxt_Dialog(t) "{{{ Dialog
 endfunction "}}}
 
 function s:Ywtxt_CreateHeading(t, l) "{{{ Create Heading.
+    " a:t: type of heading; a:l: level offset.
     let fl = foldlevel(".")
     let ln = foldclosedend('.')
     if ln == -1
@@ -457,7 +500,7 @@ function s:Ywtxt_CreateHeading(t, l) "{{{ Create Heading.
                 let headingnamepost = matchstr(headingname, '#\zs.*')
                 let heading = headingnamepre . '#' . headingnamepost . '  '
             else
-                let heading = repeat('#.', (foldlevel(".") + a:l - cus_headingslen)) . '#  '
+                let heading = repeat('#.', (fl + a:l - cus_headingslen)) . '#  '
             endif
         else
             let headingname = <SID>Ywtxt_ReturnHeadingName(1)
@@ -472,13 +515,15 @@ function s:Ywtxt_CreateHeading(t, l) "{{{ Create Heading.
     endif
     if a:t == 'heading'
         execute ln . "put ='" . heading . "'"
-    elseif a:t == 'ref'
+    else
         setlocal nofoldenable
-        call append(ln, ["% bibfile = '" . input("Bib file? ", './', 'file') . "'", '', '% endbib'])
+        if a:t == 'ref'
+            call append(ln, ["% bibfile = '" . input("Bib file? ", './', 'file') . "'", '', '% endbib'])
+        elseif a:t == 'nonexport2html'
+            call append(ln, ["% BEGIN_NOHTML", "", "% END_NOHTML"])
+        endif
         normal jj
         setlocal foldenable
-        normal zv
-        return
     endif
     if s:ywtxt_autonumber
         let save_cursor = getpos(".")
@@ -489,7 +534,11 @@ function s:Ywtxt_CreateHeading(t, l) "{{{ Create Heading.
         call setpos('.', save_cursor)
     endif
     normal zv
-    startinsert!
+    if a:t == 'ref'
+        return
+    else
+        startinsert!
+    endif
 endfunction "}}}
 
 function Ywtxt_toc_cmd(op,pos,jumpp,tocd,...) "{{{ command on mom file in toc window.
@@ -550,7 +599,7 @@ function Ywtxt_toc_cmd(op,pos,jumpp,tocd,...) "{{{ command on mom file in toc wi
         endfor
     elseif a:op == 'reindent'
         let n = 1
-        for i in toclst[0][startline - 1 - s:ywtxt_toc_title_h : curln - 1 - s:ywtxt_toc_title_h]
+        for i in toclst[0][(startline - 1 - s:ywtxt_toc_title_h) : (curln - 1 - s:ywtxt_toc_title_h)]
             if a:1 == 'l' && level > 1
                 call setline(i[2], <SID>Ywtxt_ReturnHeadingName(i[5] - 1) . '  ' . i[1])
             elseif a:1 == 'r' && (level <= prevlevel)
@@ -598,7 +647,7 @@ function Ywtxt_keymaps() "{{{ key maps.
         nmap <silent> <buffer> K :call Ywtxt_toc_cmd('outlinemove', 0, 1, 0, 'k')<CR>
         nmap <silent> <buffer> q :bwipeout<CR>
         nmap <silent> <buffer> r :call Ywtxt_OpenTOC(b:ywtxt_toc_type)<CR>
-        nmap <silent> <buffer> <Space> :call Ywtxt_toc_cmd('jump', 0, 0, 0)<CR>
+        nmap <silent> <buffer> <Space> :call Ywtxt_toc_cmd('jump', 0, 1, 0)<CR>zz:wincmd p<CR>zv
         nmap <silent> <buffer> <Enter> :call Ywtxt_toc_cmd('jump', 0, 1, 0)<CR>
         nmap <silent> <buffer> X :call Ywtxt_toc_cmd('toggleFolding', 0, 1, 0)<CR>
         nmap <silent> <buffer> x :call Ywtxt_toc_cmd('jump', 0, 1, 1)<CR>
@@ -616,14 +665,8 @@ function Ywtxt_keymaps() "{{{ key maps.
 endfunction "}}}
 
 function Ywtxt_Tab(k) "{{{ Function for <tab> and <enter>
-    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref')
-    let refsnuml = len(refslnlst[0])
-    let refsnumr = len(refslnlst[1])
-    if (refsnuml == refsnumr) && (refsnuml != 0)
-        let refsnum = refsnuml
-    else
-        let refsnum = 0
-    endif
+    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref', 0)
+    let refsnum = refslnlst[2]
     let line = getline('.')
     let lnum = line('.')
     if refsnum
@@ -718,6 +761,9 @@ function s:Ywtxt_ToHtml(...) "{{{ ywtxt to html FIXME: ugly.
     normal gg0
     execute 'g/^% input .*/keepalt read ' . expand(matchstr(getline(3), 'input\s*\zs.*$'))
     let refsdic = <SID>Ywtxt_GetRefLst(1, '$')
+    if <SID>Ywtxt_ReturnPairRegion('nonexport2html', 0)[2]
+        g/^% BEGIN_NOHTML/,/^% END_NOHTML/delete " Delete the comment region
+    endif
     g/^\s*%/delete " Delete the comment line
     normal zR
     if exists("a:1")
@@ -899,8 +945,8 @@ endfunction "}}}
 
 function s:Ywtxt_GenBibliography() "{{{ Generate bibliography.
     let save_cursor = getpos(".")
-    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref')
-    let refsnum = len(refslnlst[0])
+    let refslnlst = <SID>Ywtxt_ReturnPairRegion('ref', 0)
+    let refsnum = refslnlst[2]
     if refsnum == 0
         return
     endif

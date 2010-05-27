@@ -2,7 +2,7 @@
 " Author: Yue Wu <ywupub@gmail.com>
 " License: BSD
 
-if exists("b:current_syntax")
+if exists("b:current_syntax") && b:current_syntax == 'ywtxt'
   finish
 endif
 scriptencoding utf-8
