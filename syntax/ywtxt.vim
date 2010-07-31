@@ -9,6 +9,16 @@ scriptencoding utf-8
 
 call Ywtxt_SearchHeadingPat()
 
+if has("gui_running")
+  redir => ywtxt_folded
+  silent highlight Normal
+  redir END
+  execute 'highlight default Folded term=bold cterm=bold gui=bold ' . matchstr(ywtxt_folded, 'xxx\s\+\zs.*\ze\(\s\+font\|\)')
+else
+  highlight clear Folded
+  highlight default Folded term=bold cterm=bold
+endif
+
 syntax match ywtxt_title /\%^\s\+\S.*\s$/ contains=ALL
 highlight default link ywtxt_title Title
 
@@ -21,6 +31,9 @@ syntax keyword ywtxt_todo FIXME TODO
 highlight default link ywtxt_todo Todo
 syntax keyword ywtxt_note note Note NOTE note: Note: NOTE: Notes Notes: 注意
 highlight default link ywtxt_note Todo
+
+syntax region ywtxt_nohtml matchgroup=Comment start=/^% BEGIN_NOHTML.*/ end=/^% END_NOHTML.*/ contains=ALL fold keepend
+syntax region ywtxt_snip matchgroup=Comment start=/^% BEGINSNIP.*/ end=/^% ENDSNIP.*/ contains=ALL fold keepend
 
 syntax match ywtxt_ref '\^\[[^]]*\]'
 highlight default link ywtxt_ref Comment
@@ -58,7 +71,7 @@ syntax match ywtxt_italic '\%(\s\|^\|[^\x00-\xff]\)\zs/[^/[:blank:][:punct:]，�
 highlight ywtxt_italic term=italic cterm=italic gui=italic
 
 call Ywtxt_Syntax_HeadingsPat()
-call Ywtxt_highlightheadings()
+call Ywtxt_highlightheadings('heading')
 
 let b:current_syntax = "ywtxt"
 

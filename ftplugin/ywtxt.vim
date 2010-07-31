@@ -4,14 +4,14 @@
 
 scriptencoding utf-8
 
-setlocal fdm=expr
-setlocal foldexpr=Ywtxt_FoldExpr(v:lnum)
-setlocal foldtext=getline(v:foldstart)
-
 if match(bufname(""), '_.*_TOC_') == 0 " For toc window
+    setlocal fdm=expr
+    setlocal foldexpr=Ywtxt_toc_FoldExpr(v:lnum)
     setlocal cursorline
 else " For mom window
+    setlocal fdm=syntax
 endif
+setlocal foldtext=getline(v:foldstart)
 
 setlocal comments=:%
 setlocal isf-=[
