@@ -9,7 +9,7 @@ if match(bufname(""), '_.*_TOC_') == 0 " For toc window
     setlocal foldexpr=Ywtxt_toc_FoldExpr(v:lnum)
     setlocal cursorline
 else " For mom window
-    setlocal fdm=syntax
+    setlocal fdm=marker
 endif
 setlocal foldtext=getline(v:foldstart)
 

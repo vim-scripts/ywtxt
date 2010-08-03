@@ -32,8 +32,7 @@ highlight default link ywtxt_todo Todo
 syntax keyword ywtxt_note note Note NOTE note: Note: NOTE: Notes Notes: 注意
 highlight default link ywtxt_note Todo
 
-syntax region ywtxt_nohtml matchgroup=Comment start=/^% BEGIN_NOHTML.*/ end=/^% END_NOHTML.*/ contains=ALL fold keepend
-syntax region ywtxt_snip matchgroup=Comment start=/^% BEGINSNIP.*/ end=/^% ENDSNIP.*/ contains=ALL fold keepend
+syntax region ywtxt_nohtml matchgroup=Comment start=/^% BEGIN_NOHTML.*/ end=/^% END_NOHTML.*/ contains=ALL keepend
 
 syntax match ywtxt_ref '\^\[[^]]*\]'
 highlight default link ywtxt_ref Comment
